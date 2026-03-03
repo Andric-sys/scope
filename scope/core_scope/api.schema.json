@@ -1,0 +1,507 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://core-gl.com/schemas/shipment-order.json",
+  "title": "Shipment Order",
+  "description": "Esquema de validación para órdenes de envío (Shipment Orders)",
+  "type": "object",
+  "required": [
+    "identifier",
+    "number",
+    "owner",
+    "module",
+    "orderDate",
+    "customer",
+    "conveyanceType"
+  ],
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Identificador único UUID de la orden"
+    },
+    "legacyIdentifier": {
+      "type": "string",
+      "description": "Identificador del sistema anterior"
+    },
+    "lastModified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de última modificación"
+    },
+    "number": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}\\d{8}$",
+      "description": "Número de orden (ej: CGL23010004)"
+    },
+    "owner": {
+      "$ref": "#/definitions/Partner"
+    },
+    "module": {
+      "type": "string",
+      "enum": ["simpleShipment", "masterShipment", "houseShipment"],
+      "description": "Tipo de módulo de envío"
+    },
+    "orderDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la orden"
+    },
+    "economicDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha económica"
+    },
+    "customer": {
+      "$ref": "#/definitions/AddressedEntity"
+    },
+    "customerReferences": {
+      "type": ["string", "null"]
+    },
+    "cancelled": {
+      "type": "boolean",
+      "description": "Indica si la orden está cancelada"
+    },
+    "cancellationReason": {
+      "type": ["string", "null"]
+    },
+    "blocked": {
+      "type": "boolean",
+      "description": "Indica si la orden está bloqueada"
+    },
+    "clerk": {
+      "type": "string",
+      "format": "email",
+      "description": "Email del empleado responsable"
+    },
+    "shipmentType": {
+      "type": ["string", "null"]
+    },
+    "conveyanceType": {
+      "type": "string",
+      "enum": ["air", "sea", "road", "rail", "multimodal"],
+      "description": "Tipo de transporte"
+    },
+    "usi": {
+      "type": "string",
+      "description": "Universal Shipment Identifier"
+    },
+    "consolidated": {
+      "type": "boolean"
+    },
+    "shipper": {
+      "$ref": "#/definitions/AddressedEntity"
+    },
+    "consignee": {
+      "$ref": "#/definitions/AddressedEntity"
+    },
+    "departure": {
+      "$ref": "#/definitions/Location"
+    },
+    "destination": {
+      "$ref": "#/definitions/Location"
+    },
+    "incoTerms": {
+      "type": "string",
+      "enum": ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"],
+      "description": "Términos comerciales internacionales"
+    },
+    "mainTransportFreightTerm": {
+      "type": "string",
+      "enum": ["P", "C"],
+      "description": "P=Prepaid, C=Collect"
+    },
+    "movementScope": {
+      "type": "string",
+      "enum": [
+        "door2Door",
+        "door2Port",
+        "port2Door",
+        "port2Port",
+        "door2Depot",
+        "depot2Door",
+        "depot2Port",
+        "port2Depot"
+      ]
+    },
+    "pieces": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Número de piezas"
+    },
+    "grossWeight": {
+      "$ref": "#/definitions/Measurement"
+    },
+    "chargeableWeight": {
+      "$ref": "#/definitions/Measurement"
+    },
+    "volume": {
+      "$ref": "#/definitions/Measurement"
+    },
+    "natureOfGoods": {
+      "type": "string",
+      "description": "Descripción de la mercancía"
+    },
+    "dgr": {
+      "type": "boolean",
+      "description": "Dangerous Goods Regulation"
+    },
+    "partnerRelatedData": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PartnerRelatedData"
+      }
+    },
+    "references": {
+      "$ref": "#/definitions/References"
+    },
+    "milestones": {
+      "$ref": "#/definitions/Milestones"
+    },
+    "organizationCode": {
+      "type": "string"
+    },
+    "legalEntityCode": {
+      "type": "string"
+    },
+    "branchCode": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "Partner": {
+      "type": "object",
+      "required": ["identifier", "code", "name"],
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "customerIdentificationNumber": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "Address": {
+      "type": "object",
+      "required": ["name", "street", "city", "zip", "country"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "name2": {
+          "type": ["string", "null"]
+        },
+        "name3": {
+          "type": ["string", "null"]
+        },
+        "attention": {
+          "type": ["string", "null"]
+        },
+        "street": {
+          "type": "string"
+        },
+        "street2": {
+          "type": ["string", "null"]
+        },
+        "street3": {
+          "type": ["string", "null"]
+        },
+        "poBoxNumber": {
+          "type": ["string", "null"]
+        },
+        "city": {
+          "type": "string"
+        },
+        "zip": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        }
+      }
+    },
+    "AddressedEntity": {
+      "type": "object",
+      "required": ["partner", "address"],
+      "properties": {
+        "partner": {
+          "$ref": "#/definitions/Partner"
+        },
+        "address": {
+          "$ref": "#/definitions/Address"
+        },
+        "contact": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "required": ["country", "unlocode", "name"],
+      "properties": {
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "unlocode": {
+          "type": "string",
+          "pattern": "^[A-Z]{5}$"
+        },
+        "iataCode": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{3}$"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "MoneyValue": {
+      "type": "object",
+      "required": ["value", "currency"],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "Measurement": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["kg", "lb", "m3", "ft3", "m", "ft"]
+        }
+      }
+    },
+    "DateValue": {
+      "type": "object",
+      "required": ["date"],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "TimeInterval": {
+      "type": "object",
+      "required": ["startInclusive", "endInclusive"],
+      "properties": {
+        "startInclusive": {
+          "$ref": "#/definitions/DateValue"
+        },
+        "endInclusive": {
+          "$ref": "#/definitions/DateValue"
+        }
+      }
+    },
+    "CostCenter": {
+      "type": "object",
+      "required": ["identifier", "code"],
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "JobcostingTotals": {
+      "type": "object",
+      "required": [
+        "bookedIncome",
+        "bookedCost",
+        "totalIncome",
+        "totalCost",
+        "profit",
+        "grossMargin"
+      ],
+      "properties": {
+        "bookedIncome": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "bookedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "openAndEstimatedIncome": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "openAndEstimatedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "estimatedFixatedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "transitBookedIncome": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "transitBookedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "transitOpenAndEstimatedIncome": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "transitOpenAndEstimatedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "transitEstimatedFixatedCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "totalIncome": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "totalCost": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "profit": {
+          "$ref": "#/definitions/MoneyValue"
+        },
+        "grossMargin": {
+          "type": "number"
+        }
+      }
+    },
+    "PartnerRelatedData": {
+      "type": "object",
+      "required": [
+        "owner",
+        "number",
+        "costCenter",
+        "financialStatus",
+        "jobcostingTotalsLocalCurrency",
+        "jobcostingTotalsOrganizationCurrency"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/definitions/Partner"
+        },
+        "number": {
+          "type": "string"
+        },
+        "costCenter": {
+          "$ref": "#/definitions/CostCenter"
+        },
+        "financialStatus": {
+          "type": "string",
+          "enum": ["open", "preBilled", "billed", "closed"]
+        },
+        "statusToPreBilledDate": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "statusToBilledDate": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "statusToClosedDate": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "jobcostingTotalsLocalCurrency": {
+          "$ref": "#/definitions/JobcostingTotals"
+        },
+        "jobcostingTotalsOrganizationCurrency": {
+          "$ref": "#/definitions/JobcostingTotals"
+        },
+        "expectedProfitStatus": {
+          "type": "string",
+          "enum": ["notSet", "set", "checked"]
+        }
+      }
+    },
+    "Reference": {
+      "type": "object",
+      "required": ["code", "number"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        }
+      }
+    },
+    "References": {
+      "type": "object",
+      "required": ["reference"],
+      "properties": {
+        "reference": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Reference"
+          }
+        }
+      }
+    },
+    "Milestone": {
+      "type": "object",
+      "required": [
+        "code",
+        "description",
+        "completed",
+        "active",
+        "publicVisible",
+        "plannedTime"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "publicVisible": {
+          "type": "boolean"
+        },
+        "plannedTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actualTime": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    },
+    "Milestones": {
+      "type": "object",
+      "required": ["milestone"],
+      "properties": {
+        "milestone": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Milestone"
+          }
+        }
+      }
+    }
+  }
+}

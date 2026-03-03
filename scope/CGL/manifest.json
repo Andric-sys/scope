@@ -1,0 +1,14 @@
+{
+  "name": "CORE Global Logistics",
+  "short_name": "CGL",
+  "start_url": "/CGL/dashboard.php",
+  "scope": "/CGL/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0171e2",
+  "description": "Sistema de Gestión CORE Global Logistics",
+  "icons": [
+    { "src": "/CGL/assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/CGL/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

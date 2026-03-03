@@ -1,0 +1,546 @@
+{
+    "identifier": "03a3a6c1-1e11-4eb9-b91b-ec1f6d9250bf",
+    "legacyIdentifier": "29f08a99c1026046f59163d247b4e68d85fdc6f89d2daa4a582b819de01462a5",
+    "lastModified": "2024-01-12T17:05:14.000-06:00",
+    "number": "CGL23010004",
+    "owner": {
+        "identifier": "9f2ef725-7102-456b-b533-9c228fb5a0a7",
+        "code": "COGMX",
+        "name": "CORE GLOBAL LOGISTICS MANAGEMENT S.A. DE C.V.",
+        "customerIdentificationNumber": null
+    },
+    "module": "simpleShipment",
+    "orderDate": "2023-01-03",
+    "economicDate": "2023-01-03",
+    "customer": {
+        "partner": {
+            "identifier": "45e77573-0d4c-42e6-9fbc-c057abcee13e",
+            "code": "C0002",
+            "name": "NAPS-GUANAJUATO",
+            "customerIdentificationNumber": null
+        },
+        "address": {
+            "name": "NAPS-GUANAJUATO CAM",
+            "name2": null,
+            "name3": null,
+            "attention": null,
+            "street": "RIO SAN LORENZO 321 PARQUE TECNO INDUSTRIAL CASTRO DEL RIO",
+            "street2": null,
+            "street3": null,
+            "poBoxNumber": null,
+            "city": "IRAPUATO",
+            "zip": "36810",
+            "state": "GUA",
+            "country": "MX"
+        },
+        "contact": null
+    },
+    "customerReferences": null,
+    "cancelled": false,
+    "cancellationReason": null,
+    "blocked": false,
+    "clerk": "arli.perez@core-gl.com",
+    "shipmentType": null,
+    "conveyanceType": "road",
+    "usi": "COG-DHS-CXT-NTY-NLT",
+    "consolidated": false,
+    "masterShipmentNumber": null,
+    "masterShipmentIdentifier": null,
+    "transportDocumentNumber": null,
+    "houseDocumentNumber": null,
+    "bookingReferences": null,
+    "shipper": {
+        "partner": {
+            "identifier": "703749f0-164b-4231-9698-7f0ae9aca407",
+            "code": "SH0007",
+            "name": "VIKING DRILL AND TOOL",
+            "customerIdentificationNumber": null
+        },
+        "address": {
+            "name": "VIKING DRILL AND TOOL",
+            "name2": null,
+            "name3": null,
+            "attention": null,
+            "street": "355 STATE STREET",
+            "street2": null,
+            "street3": null,
+            "poBoxNumber": null,
+            "city": "ST PAUL",
+            "zip": "55107",
+            "state": "MN",
+            "country": "US"
+        },
+        "contact": null
+    },
+    "shipperReferences": null,
+    "requestedPickupTime": null,
+    "consignee": {
+        "partner": {
+            "identifier": "45e77573-0d4c-42e6-9fbc-c057abcee13e",
+            "code": "C0002",
+            "name": "NAPS-GUANAJUATO",
+            "customerIdentificationNumber": null
+        },
+        "address": {
+            "name": "NAPS-GUANAJUATO CAM",
+            "name2": null,
+            "name3": null,
+            "attention": null,
+            "street": "RIO SAN LORENZO 321 PARQUE TECNO INDUSTRIAL CASTRO DEL RIO",
+            "street2": null,
+            "street3": null,
+            "poBoxNumber": null,
+            "city": "IRAPUATO",
+            "zip": "36810",
+            "state": "GUA",
+            "country": "MX"
+        },
+        "contact": null
+    },
+    "consigneeReferences": null,
+    "requestedDeliveryTime": null,
+    "lineOfBusiness": null,
+    "placeOfReceipt": null,
+    "departure": {
+        "country": "US",
+        "unlocode": "USSTP",
+        "iataCode": null,
+        "name": "St Paul"
+    },
+    "destination": {
+        "country": "MX",
+        "unlocode": "MXSMG",
+        "iataCode": null,
+        "name": "San Miguel de Allende"
+    },
+    "placeOfDelivery": null,
+    "std": null,
+    "etd": {
+        "date": "2022-12-22"
+    },
+    "atd": {
+        "date": "2022-12-22"
+    },
+    "sta": null,
+    "eta": {
+        "date": "2022-12-27"
+    },
+    "ata": {
+        "date": "2022-12-27"
+    },
+    "transportDate": "2023-01-03",
+    "exportAgent": null,
+    "exportGateway": null,
+    "importAgent": null,
+    "importGateway": null,
+    "gatewayShipmentNumber": null,
+    "incoTerms": "DAP",
+    "incotermPlace": "IRAPUATO",
+    "mainTransportFreightTerm": "P",
+    "movementScope": "port2Door",
+    "sellingProduct": null,
+    "pieces": 1,
+    "packageTypes": null,
+    "grossWeight": {
+        "value": 1.360,
+        "unit": "kg"
+    },
+    "chargeableWeight": {
+        "value": 1365.300,
+        "unit": "kg"
+    },
+    "volume": {
+        "value": 4.096,
+        "unit": "m3"
+    },
+    "loadingMetres": null,
+    "natureOfGoods": "BROCA",
+    "insuranceAmount": null,
+    "freightAmount": null,
+    "freightTerms": null,
+    "otherChargesAmount": null,
+    "otherChargesTerms": null,
+    "notify": null,
+    "terminal": null,
+    "warehouseOrShed": null,
+    "mainTransportSupplier": null,
+    "mainTransportBuyingProduct": null,
+    "mainTransportPickupTimeInterval": {
+        "startInclusive": {
+            "date": "2022-12-22"
+        },
+        "endInclusive": {
+            "date": "2022-12-22"
+        }
+    },
+    "mainTransportDropoffTimeInterval": {
+        "startInclusive": {
+            "date": "2022-12-27"
+        },
+        "endInclusive": {
+            "date": "2022-12-27"
+        }
+    },
+    "airRelated": null,
+    "seaRelated": null,
+    "roadRelated": {
+        "roadCarrier": null,
+        "pickupWindow": {
+            "startInclusive": {
+                "date": "2022-12-22"
+            },
+            "endInclusive": {
+                "date": "2022-12-22"
+            }
+        },
+        "deliveryWindow": {
+            "startInclusive": {
+                "date": "2022-12-27"
+            },
+            "endInclusive": {
+                "date": "2022-12-27"
+            }
+        },
+        "truckLicenseNumber": null
+    },
+    "salesPerson": null,
+    "salesZipZone": null,
+    "dealDate": null,
+    "salesCommission": null,
+    "remarks": null,
+    "dgr": false,
+    "dgrInformation": null,
+    "carbonFootprintCalculations": null,
+    "partnerRelatedData": [
+        {
+            "owner": {
+                "identifier": "9f2ef725-7102-456b-b533-9c228fb5a0a7",
+                "code": "COGMX",
+                "name": "CORE GLOBAL LOGISTICS MANAGEMENT S.A. DE C.V.",
+                "customerIdentificationNumber": null
+            },
+            "number": "CGL23010004",
+            "costCenter": {
+                "identifier": "cc7336e4-9f43-47bf-9088-b65ce8cbe142",
+                "code": "2000"
+            },
+            "financialStatus": "closed",
+            "statusToPreBilledDate": null,
+            "statusToBilledDate": null,
+            "statusToClosedDate": "2024-01-12",
+            "jobcostingTotalsLocalCurrency": {
+                "bookedIncome": {
+                    "value": 3897.66,
+                    "currency": "MXN"
+                },
+                "bookedCost": {
+                    "value": 1500.00,
+                    "currency": "MXN"
+                },
+                "openAndEstimatedIncome": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "openAndEstimatedCost": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "estimatedFixatedCost": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "transitBookedIncome": {
+                    "value": 12564.00,
+                    "currency": "MXN"
+                },
+                "transitBookedCost": {
+                    "value": 12564.00,
+                    "currency": "MXN"
+                },
+                "transitOpenAndEstimatedIncome": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "transitOpenAndEstimatedCost": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "transitEstimatedFixatedCost": {
+                    "value": 0.00,
+                    "currency": "MXN"
+                },
+                "totalIncome": {
+                    "value": 16461.66,
+                    "currency": "MXN"
+                },
+                "totalCost": {
+                    "value": 14064.00,
+                    "currency": "MXN"
+                },
+                "profit": {
+                    "value": 2397.66,
+                    "currency": "MXN"
+                },
+                "grossMargin": 0.615
+            },
+            "jobcostingTotalsOrganizationCurrency": {
+                "bookedIncome": {
+                    "value": 222.22,
+                    "currency": "USD"
+                },
+                "bookedCost": {
+                    "value": 85.52,
+                    "currency": "USD"
+                },
+                "openAndEstimatedIncome": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "openAndEstimatedCost": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "estimatedFixatedCost": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "transitBookedIncome": {
+                    "value": 716.31,
+                    "currency": "USD"
+                },
+                "transitBookedCost": {
+                    "value": 743.72,
+                    "currency": "USD"
+                },
+                "transitOpenAndEstimatedIncome": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "transitOpenAndEstimatedCost": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "transitEstimatedFixatedCost": {
+                    "value": 0.00,
+                    "currency": "USD"
+                },
+                "totalIncome": {
+                    "value": 938.53,
+                    "currency": "USD"
+                },
+                "totalCost": {
+                    "value": 829.24,
+                    "currency": "USD"
+                },
+                "profit": {
+                    "value": 109.29,
+                    "currency": "USD"
+                },
+                "grossMargin": 0.615
+            },
+            "expectedInvoiceAmount": null,
+            "expectedProfit": null,
+            "expectedProfitDeviation": null,
+            "expectedProfitStatus": "notSet",
+            "expectedProfitSetBy": null,
+            "expectedProfitSetOn": null,
+            "expectedProfitSetRemarks": null,
+            "checkedProfit": null,
+            "checkedProfitSetBy": null,
+            "checkedProfitSetOn": null,
+            "checkedProfitSetRemarks": null
+        }
+    ],
+    "transportOrders": null,
+    "customsOrders": null,
+    "references": {
+        "reference": [
+            {
+                "code": "AA MX",
+                "number": "CESAR VALDEZ"
+            },
+            {
+                "code": "AD",
+                "number": "NLD"
+            },
+            {
+                "code": "REF BODEGA",
+                "number": "T226878"
+            },
+            {
+                "code": "SRN",
+                "number": "CGL23010004"
+            },
+            {
+                "code": "IMP/EXP",
+                "number": "IMP"
+            },
+            {
+                "code": "REF ANT",
+                "number": "CG221483"
+            },
+            {
+                "code": "C. PED",
+                "number": "A1"
+            },
+            {
+                "code": "AA US",
+                "number": "NORMA VALDEZ"
+            },
+            {
+                "code": "REF CGT",
+                "number": "CGT23010043"
+            },
+            {
+                "code": "FAC IMP EXP",
+                "number": "CAMS44422"
+            },
+            {
+                "code": "NO PED",
+                "number": "23 24 3678 3400013"
+            },
+            {
+                "code": "IV",
+                "number": "AB 14425"
+            },
+            {
+                "code": "SCP_TO",
+                "number": "CGL23010004"
+            }
+        ]
+    },
+    "milestones": {
+        "milestone": [
+            {
+                "code": "ANTICIPADO",
+                "description": "ANTICIPADO",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "EN RECOLECCION",
+                "description": "EN RECOLECCION",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "EN TRANSITO",
+                "description": "En transito",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "CON AVISO DE ENTRADA",
+                "description": "CON AVISO DE ENTRADA",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2022-12-27T00:00:00.000-06:00",
+                "actualTime": "2022-12-27T16:09:00.000-06:00"
+            },
+            {
+                "code": "ARRIBADO",
+                "description": "ARRIBADO",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "INBOUND REVALIDADO",
+                "description": "INBOUND REVALIDADO",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "EN PREVIO",
+                "description": "EN PREVIO",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2022-12-28T00:00:00.000-06:00",
+                "actualTime": "2022-12-28T11:47:00.000-06:00"
+            },
+            {
+                "code": "EN CLASIFICACION",
+                "description": "EN CLASIFICACION",
+                "completed": false,
+                "active": false,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T11:57:03.000-06:00",
+                "actualTime": null
+            },
+            {
+                "code": "INF PEDIENTE CLIENTE",
+                "description": "INF PEDIENTE CLIENTE",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2022-12-28T16:49:00.000-06:00",
+                "actualTime": "2023-01-04T14:13:00.000-06:00"
+            },
+            {
+                "code": "EN PAGO DE PED",
+                "description": "EN PAGO DE PEDIMENTO",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2023-01-04T16:03:00.000-06:00",
+                "actualTime": "2023-01-04T17:08:00.000-06:00"
+            },
+            {
+                "code": "EN DESPACHO",
+                "description": "EN DESPACHO",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2023-01-04T00:00:00.000-06:00",
+                "actualTime": "2023-01-04T00:00:00.000-06:00"
+            },
+            {
+                "code": "EN RUTA AL CLIENTE",
+                "description": "EN RUTA AL CLIENTE",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2023-01-04T00:00:00.000-06:00",
+                "actualTime": "2023-01-04T00:00:00.000-06:00"
+            },
+            {
+                "code": "ENTREGADO",
+                "description": "ENTREGADO",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2023-01-09T00:00:00.000-06:00",
+                "actualTime": "2023-01-09T00:00:00.000-06:00"
+            },
+            {
+                "code": "CON SOPORTE DE FAC",
+                "description": "CON SOPORTE DE FACTURACION",
+                "completed": true,
+                "active": true,
+                "publicVisible": false,
+                "plannedTime": "2023-01-20T00:00:00.000-06:00",
+                "actualTime": "2023-02-01T00:00:00.000-06:00"
+            }
+        ]
+    },
+    "jobcostingEntries": null,
+    "organizationCode": "COG",
+    "legalEntityCode": "COGMX",
+    "branchCode": "COGMX"
+}
