@@ -81,7 +81,11 @@ if (!isset($_SESSION['user'])) {
 }
 
 // Si existe la función de validación de sesión activa, usarla
-if (function_exists('enforce_active_session') && isset($conn)) {
+if (!defined('CORE_SCOPE_SKIP_ACTIVE_SESSION_CHECK')) {
+    define('CORE_SCOPE_SKIP_ACTIVE_SESSION_CHECK', false);
+}
+
+if (!CORE_SCOPE_SKIP_ACTIVE_SESSION_CHECK && function_exists('enforce_active_session') && isset($conn)) {
     enforce_active_session($conn);
 }
 

@@ -1,8 +1,16 @@
 <?php
 declare(strict_types=1);
 
+define('CORE_SCOPE_SKIP_ACTIVE_SESSION_CHECK', true);
+
 // Proteger con autenticación
 require __DIR__ . '/auth_guard.php';
+
+// Importante: liberar lock de sesión para permitir polling en paralelo
+// (si no, scope_sync_status.php queda bloqueado hasta terminar esta request).
+if (session_status() === PHP_SESSION_ACTIVE) {
+  session_write_close();
+}
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
