@@ -951,6 +951,15 @@ $cssVars = core_brand_css_vars();
   }
 
   let chartMain=null, chartTraffic=null, chartOffice=null, modalChart=null;
+  let chartInvoicing=null, chartDocTypes=null, chartObjectives=null, chartObjOffice=null;
+  let chartCostStructure=null, chartMarginsByTraffic=null, chartProfitTrend=null;
+  let lastFilters = { from: $('inFrom').value, to: $('inTo').value, date_field: 'invoice_date' };
+  let lastSeries = [], lastTraffic = [], lastOffices = [], lastTopClients = [], lastInvoicing = null;
+
+  function getActiveDateField(){
+    if (state.mode === 'manual') return (state.manualBase === 'economic') ? 'economic_date' : 'invoice_date';
+    return (state.mode === 'economic') ? 'economic_date' : 'invoice_date';
+  }
 
   function setBoard(boardName){
     state.currentBoard = boardName;
@@ -990,7 +999,7 @@ $cssVars = core_brand_css_vars();
         { name:'Costos', data: costs },
         { name:'Utilidad', data: profit }
       ],
-      colors: ['#0171e2', '#65625F', '#000F9F'],
+      colors: ['#eab308', '#ef4444', '#22c55e'],
       fill: { type:'gradient', gradient: { opacityFrom: 0.25, opacityTo: 0.05 } }
     };
     if (chartMain) chartMain.destroy();
@@ -1018,7 +1027,7 @@ $cssVars = core_brand_css_vars();
       series: values,
       tooltip: { y: { formatter: (v)=> money(v) } },
       legend: { position: 'bottom' },
-      colors: ['#0171e2','#004fa8','#001b56','#65625F']
+      colors: ['#eab308','#ef4444','#22c55e','#f97316']
     };
     if (chartTraffic) chartTraffic.destroy();
     chartTraffic = new ApexCharts(document.querySelector("#chartTraffic"), opt);
@@ -1036,7 +1045,7 @@ $cssVars = core_brand_css_vars();
       dataLabels: { enabled:false },
       xaxis: { categories: labels },
       tooltip: { y: { formatter: (v)=> money(v) } },
-      colors: ['#0171e2','#000F9F'],
+      colors: ['#eab308','#ef4444'],
       series: [
         { name:'Ventas', data: sales },
         { name:'Utilidad', data: profit }
@@ -1063,26 +1072,15 @@ $cssVars = core_brand_css_vars();
   async function openCustomerModal(customerCode, customerName){
     showModal(`Cliente · ${customerName} (${customerCode})`);
 
-    const dateField = (state.mode === 'economic') ? 'economic_date' : 'invoice_date';
+    const dateField = getActiveDateField();
     const qs = new URLSearchParams({
       kind:'customer',
       customer_code: customerCode,
       date_field: dateField,
-      from: $('inFrom').value,
-      to: $('inTo').value
+      currency: 'MXN',
+      from: lastFilters.from || $('inFrom').value,
+      to: lastFilters.to || $('inTo').value
     });
-
-    if (state.mode !== 'manual'){
-      // forzamos a mes actual si no es manual
-      const d = new Date();
-      const yy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const last = new Date(yy, d.getMonth()+1, 0).getDate();
-      qs.set('from', `${yy}-${mm}-01`);
-      qs.set('to', `${yy}-${mm}-${String(last).padStart(2,'0')}`);
-    } else {
-      qs.set('date_field', (state.manualBase === 'economic') ? 'economic_date' : 'invoice_date');
-    }
 
     if (state.office !== 'all') qs.set('office', state.office);
     if (state.traffic !== 'all') qs.set('traffic', state.traffic);
@@ -1101,7 +1099,7 @@ $cssVars = core_brand_css_vars();
       stroke: { curve:'smooth', width: 3 },
       xaxis: { categories: labels },
       tooltip: { y: { formatter: (v)=> money(v) } },
-      colors: ['#0171e2','#65625F','#000F9F'],
+      colors: ['#eab308','#ef4444','#22c55e'],
       series: [
         { name:'Ventas', data: sales },
         { name:'Costos', data: costs },
@@ -1136,21 +1134,11 @@ $cssVars = core_brand_css_vars();
     const qs = new URLSearchParams({
       kind:'traffic',
       traffic_code: trafficCode,
-      date_field: (state.mode === 'economic') ? 'economic_date' : 'invoice_date',
-      from: $('inFrom').value,
-      to: $('inTo').value
+      date_field: getActiveDateField(),
+      currency: 'MXN',
+      from: lastFilters.from || $('inFrom').value,
+      to: lastFilters.to || $('inTo').value
     });
-
-    if (state.mode !== 'manual'){
-      const d = new Date();
-      const yy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const last = new Date(yy, d.getMonth()+1, 0).getDate();
-      qs.set('from', `${yy}-${mm}-01`);
-      qs.set('to', `${yy}-${mm}-${String(last).padStart(2,'0')}`);
-    } else {
-      qs.set('date_field', (state.manualBase === 'economic') ? 'economic_date' : 'invoice_date');
-    }
 
     if (state.office !== 'all') qs.set('office', state.office);
 
@@ -1167,7 +1155,7 @@ $cssVars = core_brand_css_vars();
       dataLabels: { enabled:false },
       xaxis: { categories: labels },
       tooltip: { y: { formatter: (v)=> money(v) } },
-      colors: ['#004fa8'],
+      colors: ['#22c55e'],
       series: [{ name:'Ventas', data: values }]
     });
     modalChart.render();
@@ -1202,21 +1190,11 @@ $cssVars = core_brand_css_vars();
     const qs = new URLSearchParams({
       kind:'concept',
       concept_code: conceptCode,
-      date_field: (state.mode === 'economic') ? 'economic_date' : 'invoice_date',
-      from: $('inFrom').value,
-      to: $('inTo').value
+      date_field: getActiveDateField(),
+      currency: 'MXN',
+      from: lastFilters.from || $('inFrom').value,
+      to: lastFilters.to || $('inTo').value
     });
-
-    if (state.mode !== 'manual'){
-      const d = new Date();
-      const yy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const last = new Date(yy, d.getMonth()+1, 0).getDate();
-      qs.set('from', `${yy}-${mm}-01`);
-      qs.set('to', `${yy}-${mm}-${String(last).padStart(2,'0')}`);
-    } else {
-      qs.set('date_field', (state.manualBase === 'economic') ? 'economic_date' : 'invoice_date');
-    }
 
     if (state.office !== 'all') qs.set('office', state.office);
     if (state.traffic !== 'all') qs.set('traffic', state.traffic);
@@ -1259,6 +1237,7 @@ $cssVars = core_brand_css_vars();
       mode: state.mode,
       office: state.office,
       traffic: state.traffic,
+      currency: 'MXN',
       months: '12'
     });
 
@@ -1292,14 +1271,20 @@ $cssVars = core_brand_css_vars();
     $('dCosts').textContent = '—';
 
     const f = data.filters || {};
+    lastFilters = f;
+    lastSeries = Array.isArray(data.series) ? data.series : [];
+    lastTraffic = Array.isArray(data.traffic) ? data.traffic : [];
+    lastOffices = Array.isArray(data.offices) ? data.offices : [];
+    lastTopClients = Array.isArray(data.top_clients) ? data.top_clients : [];
+    lastInvoicing = data.invoicing || null;
     $('lblRange').textContent = `${f.from} → ${f.to}`;
 
-    buildMain(Array.isArray(data.series) ? data.series : []);
-    buildTraffic(Array.isArray(data.traffic) ? data.traffic : []);
-    buildOffice(Array.isArray(data.offices) ? data.offices : []);
+    buildMain(lastSeries);
+    buildTraffic(lastTraffic);
+    buildOffice(lastOffices);
 
     const tb = $('tblTop').querySelector('tbody');
-    const rows = Array.isArray(data.top_clients) ? data.top_clients : [];
+    const rows = lastTopClients;
     if (!rows.length){
       tb.innerHTML = `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
     } else {
@@ -1318,17 +1303,58 @@ $cssVars = core_brand_css_vars();
       }).join('');
     }
 
-    // Placeholder para otros tableros (se pueden llenar con datos posteriores)
-    updatePlaceholderBoards();
+    updatePlaceholderBoards(k, d);
   }
 
-  function updatePlaceholderBoards(){
-    // Tablero 2: Facturación - usar datos existentes
-    $('fkTotal').textContent = '—';
-    $('fkIncome').textContent = $('kSales').textContent;
-    $('fkIVA').textContent = $('kVat').textContent;
+  function updatePlaceholderBoards(kpis, deltas){
+    // Tablero 2: Facturación (vistas_crudas)
+    const inv = lastInvoicing || { total_facturas:0, income:0, iva:0, monthly:[], doc_types:[], recent:[] };
+    $('fkTotal').textContent = Number(inv.total_facturas || 0).toLocaleString('es-MX');
+    $('fkIncome').textContent = money(inv.income || 0);
+    $('fkIVA').textContent = money(inv.iva || 0);
     $('fkDaysAvg').textContent = '—';
-    $('dfIncome').textContent = $('dSales').innerHTML;
+    deltaPill($('dfIncome'), deltas.sales_pct || 0, 'pct');
+
+    const invSeries = Array.isArray(inv.monthly) ? inv.monthly : [];
+    const invLabels = invSeries.map(r => r.ym);
+    const invTotals = invSeries.map(r => Number(r.total || 0));
+    if (chartInvoicing) chartInvoicing.destroy();
+    chartInvoicing = new ApexCharts(document.querySelector('#chartInvoicing'), {
+      chart: { type:'area', height:320, toolbar:{show:false} },
+      stroke: { curve:'smooth', width:3 },
+      dataLabels: { enabled:false },
+      xaxis: { categories: invLabels },
+      tooltip: { y: { formatter: (v)=> money(v) } },
+      series: [{ name:'Facturación', data: invTotals }],
+      colors: ['#eab308'],
+      fill: { type:'gradient', gradient: { opacityFrom: 0.22, opacityTo: 0.05 } }
+    });
+    chartInvoicing.render();
+
+    const docRows = Array.isArray(inv.doc_types) ? inv.doc_types : [];
+    if (chartDocTypes) chartDocTypes.destroy();
+    chartDocTypes = new ApexCharts(document.querySelector('#chartDocTypes'), {
+      chart: { type:'donut', height:320 },
+      labels: docRows.map(r => (r.doc_type || 'OTROS')),
+      series: docRows.map(r => Number(r.total || 0)),
+      tooltip: { y: { formatter: (v)=> money(v) } },
+      legend: { position: 'bottom' },
+      colors: ['#eab308','#ef4444','#22c55e','#f97316','#a855f7','#06b6d4']
+    });
+    chartDocTypes.render();
+
+    const invTb = $('tblInvoicing').querySelector('tbody');
+    const invRecent = Array.isArray(inv.recent) ? inv.recent : [];
+    invTb.innerHTML = invRecent.length
+      ? invRecent.map(r => `<tr>
+          <td>${r.fecha || ''}</td>
+          <td>${r.referencia || ''}</td>
+          <td>${r.cliente || ''}</td>
+          <td>${money(r.monto || 0)}</td>
+          <td>${money(r.iva || 0)}</td>
+          <td>${money(r.total || 0)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" class="muted">Sin datos</td></tr>';
 
     // Tablero 3: Objetivos - cargar metas desde API
     loadMetas();
@@ -1339,15 +1365,59 @@ $cssVars = core_brand_css_vars();
     // Tablero 4: Costos & Profit
     $('ckIncome').textContent = $('kSales').textContent;
     $('ckDirectCosts').textContent = $('kCosts').textContent;
-    $('ckIndirectCosts').textContent = '—';
+    $('ckIndirectCosts').textContent = money(kpis.vat_sales || 0);
     $('ckNetProfit').textContent = $('kProfit').textContent;
     $('dkNetProfit').innerHTML = $('dProfit').innerHTML;
 
-    // Llenar tablas de placeholder
-    const emptyMsg = '<tr><td colspan="6" class="muted">Datos disponibles en actualización siguiente</td></tr>';
-    $('tblInvoicing').querySelector('tbody').innerHTML = emptyMsg;
-    $('tblObjectives').querySelector('tbody').innerHTML = emptyMsg;
+    if (chartCostStructure) chartCostStructure.destroy();
+    chartCostStructure = new ApexCharts(document.querySelector('#chartCostStructure'), {
+      chart: { type:'donut', height:320 },
+      labels: ['Costos Directos','IVA','Utilidad'],
+      series: [Number(kpis.costs||0), Number(kpis.vat_sales||0), Number(kpis.profit||0)],
+      tooltip: { y: { formatter: (v)=> money(v) } },
+      legend: { position:'bottom' },
+      colors: ['#ef4444','#f97316','#22c55e']
+    });
+    chartCostStructure.render();
+
+    if (chartMarginsByTraffic) chartMarginsByTraffic.destroy();
+    chartMarginsByTraffic = new ApexCharts(document.querySelector('#chartMarginsByTraffic'), {
+      chart: { type:'bar', height:320, toolbar:{show:false} },
+      plotOptions: { bar: { borderRadius: 8 } },
+      dataLabels: { enabled:false },
+      xaxis: { categories: lastTraffic.map(r => trafficLabel(r.traffic)) },
+      tooltip: { y: { formatter: (v)=> pct(v) } },
+      series: [{ name:'Margen', data: lastTraffic.map(r => Number(r.margin || 0)) }],
+      colors: ['#22c55e']
+    });
+    chartMarginsByTraffic.render();
+
+    if (chartProfitTrend) chartProfitTrend.destroy();
+    chartProfitTrend = new ApexCharts(document.querySelector('#chartProfitTrend'), {
+      chart: { type:'line', height:320, toolbar:{show:false} },
+      stroke: { curve:'smooth', width:3 },
+      dataLabels: { enabled:false },
+      xaxis: { categories: lastSeries.map(r => r.ym) },
+      tooltip: { y: { formatter: (v)=> money(v) } },
+      series: [{ name:'Utilidad', data: lastSeries.map(r => Number(r.profit || 0)) }],
+      colors: ['#22c55e']
+    });
+    chartProfitTrend.render();
+
+    const profitRows = [...lastTopClients].sort((a,b)=>Number(b.profit||0)-Number(a.profit||0)).slice(0,10);
     $('tblProfitCustomers').querySelector('tbody').innerHTML = $('tblTop').querySelector('tbody').innerHTML;
+    $('tblProfitCustomers').querySelector('tbody').innerHTML = profitRows.length
+      ? profitRows.map(r => {
+          const costs = Number(r.sales || 0) - Number(r.profit || 0);
+          return `<tr>
+            <td>${r.customer_name || ''}</td>
+            <td>${money(r.sales || 0)}</td>
+            <td>${money(costs)}</td>
+            <td>${money(r.profit || 0)}</td>
+            <td>${pct(r.margin || 0)}</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="5" class="muted">Sin datos</td></tr>';
   }
 
   window.__openCustomer = (code, name) => openCustomerModal(code, name);
@@ -1405,6 +1475,56 @@ $cssVars = core_brand_css_vars();
     
     // Actualizar tabla de metas mensuales
     updateMetasTable();
+
+    // Actualizar gráficas de objetivos
+    const metasMensuales = [];
+    const ejecutadoMensual = [];
+    const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const yearTarget = 2026;
+    const salesByMonth = {};
+    (lastSeries || []).forEach(r => {
+      const ym = String(r.ym || '');
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      const yy = Number(ym.slice(0,4));
+      const mm = Number(ym.slice(5,7));
+      if (yy === yearTarget) salesByMonth[mm] = Number(r.sales || 0);
+    });
+    for (let i = 1; i <= 12; i++) {
+      metasMensuales.push(Number((metasData[i]?.meta) || 0));
+      ejecutadoMensual.push(Number(salesByMonth[i] || 0));
+    }
+
+    if (chartObjectives) chartObjectives.destroy();
+    chartObjectives = new ApexCharts(document.querySelector('#chartObjectives'), {
+      chart: { type:'bar', height:320, toolbar:{show:false} },
+      plotOptions: { bar: { borderRadius: 8, columnWidth:'45%' } },
+      dataLabels: { enabled:false },
+      xaxis: { categories: labels },
+      tooltip: { y: { formatter: (v)=> money(v) } },
+      series: [
+        { name:'Meta', data: metasMensuales },
+        { name:'Ejecutado', data: ejecutadoMensual },
+      ],
+      colors: ['#eab308','#22c55e']
+    });
+    chartObjectives.render();
+
+    const officeLabels = (lastOffices || []).map(r => r.office || '—');
+    const officePct = (lastOffices || []).map(r => {
+      const goal = Number(metaAnual ? metaAnual.meta : 0) / Math.max((lastOffices || []).length || 1, 1);
+      return goal > 0 ? Number(r.sales || 0) / goal : 0;
+    });
+    if (chartObjOffice) chartObjOffice.destroy();
+    chartObjOffice = new ApexCharts(document.querySelector('#chartObjOffice'), {
+      chart: { type:'bar', height:320, toolbar:{show:false} },
+      plotOptions: { bar: { borderRadius: 8 } },
+      dataLabels: { enabled:false },
+      xaxis: { categories: officeLabels },
+      tooltip: { y: { formatter: (v)=> pct(v) } },
+      series: [{ name:'Cumplimiento', data: officePct }],
+      colors: ['#22c55e']
+    });
+    chartObjOffice.render();
   }
   
   function updateMetasTable() {
@@ -1412,11 +1532,21 @@ $cssVars = core_brand_css_vars();
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     
+    const salesByMonth = {};
+    const yearTarget = 2026;
+    (lastSeries || []).forEach(r => {
+      const ym = String(r.ym || '');
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      const yy = Number(ym.slice(0,4));
+      const mm = Number(ym.slice(5,7));
+      if (yy === yearTarget) salesByMonth[mm] = Number(r.sales || 0);
+    });
+
     let html = '';
     for (let i = 1; i <= 12; i++) {
       const meta = metasData[i];
       const metaValue = meta ? meta.meta : 0;
-      const ejecutado = 0; // Aquí se debería calcular desde los datos reales
+      const ejecutado = Number(salesByMonth[i] || 0);
       const brecha = metaValue - ejecutado;
       const pctCumpl = metaValue > 0 ? (ejecutado / metaValue) * 100 : 0;
       
@@ -1536,6 +1666,7 @@ $cssVars = core_brand_css_vars();
         mode: state.mode,
         office: state.office,
         traffic: state.traffic,
+        currency: 'MXN',
         months: '12'
       });
 
@@ -1674,13 +1805,13 @@ $cssVars = core_brand_css_vars();
         name: '% del total',
         data: values,
       }],
-      colors: ['#0171e2'],
+      colors: ['#eab308', '#ef4444', '#22c55e', '#f97316', '#a855f7', '#06b6d4'],
       plotOptions: {
         bar: {
           horizontal: true,
           borderRadius: 6,
           barHeight: '70%',
-          distributed: false,
+          distributed: true,
         }
       },
       xaxis: {
@@ -1731,7 +1862,7 @@ $cssVars = core_brand_css_vars();
     select.innerHTML = html;
   }
 
-  function onClientHistorySelect(event) {
+  async function onClientHistorySelect(event) {
     const index = parseInt(event.target.value);
     if (isNaN(index) || !clientsData[index]) {
       $('chartClientHistory').style.display = 'none';
@@ -1740,48 +1871,80 @@ $cssVars = core_brand_css_vars();
     }
 
     const client = clientsData[index];
-    displayClientHistory(client);
+    await displayClientHistory(client);
   }
 
-  function displayClientHistory(client) {
-    // Simular historial de facturación por mes y año
-    // En producción, estos datos vendrían de una API
+  async function displayClientHistory(client) {
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const currentYear = new Date().getFullYear();
-    
-    // Generar datos simulados para 2024, 2025 y 2026
-    const years = [2024, 2025, 2026];
-    const seriesData = [];
-    const tableData = { headers: ['Mes', ...years.map(y => y.toString())], rows: [] };
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const years = [currentYear - 2, currentYear - 1, currentYear];
 
-    meses.forEach((mes, idx) => {
-      const row = [mes];
-      years.forEach(year => {
-        // Valor aleatorio basado en el cliente y mes para simular variación
-        const baseValue = client.sales / 12;
-        const variation = (Math.random() * 0.4 - 0.2); // -20% a +20%
-        const monthValue = Math.max(0, baseValue * (1 + variation));
-        row.push(monthValue);
-      });
-      tableData.rows.push(row);
+    const dateField = (state.mode === 'manual')
+      ? ((state.manualBase === 'economic') ? 'economic_date' : 'invoice_date')
+      : ((state.mode === 'economic') ? 'economic_date' : 'invoice_date');
+
+    const qs = new URLSearchParams({
+      kind: 'customer',
+      customer_code: String(client.customer_code || ''),
+      date_field: dateField,
+      from: `${years[0]}-01-01`,
+      to: `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(new Date(currentYear, currentMonth, 0).getDate()).padStart(2, '0')}`,
     });
 
-    // Preparar series para gráfico
-    years.forEach((year, yearIdx) => {
-      const data = [];
-      meses.forEach((mes, mesIdx) => {
-        data.push(tableData.rows[mesIdx][yearIdx + 1]);
-      });
-      seriesData.push({
-        name: year.toString(),
-        data: data
-      });
+    if (state.office !== 'all') qs.set('office', state.office);
+    if (state.traffic !== 'all') qs.set('traffic', state.traffic);
+
+    $('clientHistoryTable').innerHTML = '<div class="muted">Cargando historial…</div>';
+
+    let rows = [];
+    try {
+      const res = await fetch('api_detail.php?' + qs.toString());
+      const data = await res.json();
+      rows = Array.isArray(data.rows) ? data.rows : [];
+    } catch (error) {
+      console.error('Error cargando historial del cliente:', error);
+      $('chartClientHistory').style.display = 'none';
+      $('clientHistoryTable').innerHTML = '<div class="muted">No se pudo cargar el historial.</div>';
+      return;
+    }
+
+    const matrix = {};
+    years.forEach((year) => {
+      matrix[year] = {};
+      for (let month = 1; month <= 12; month++) {
+        matrix[year][month] = 0;
+      }
     });
 
-    // Mostrar gráfico
+    rows.forEach((r) => {
+      const ym = String(r.ym || '');
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      const year = parseInt(ym.slice(0, 4), 10);
+      const month = parseInt(ym.slice(5, 7), 10);
+      if (!years.includes(year) || month < 1 || month > 12) return;
+      matrix[year][month] = Number(r.sales || 0);
+    });
+
+    for (let month = currentMonth + 1; month <= 12; month++) {
+      matrix[currentYear][month] = 0;
+    }
+
+    const tableData = {
+      headers: ['Mes', ...years.map(y => y.toString())],
+      rows: meses.map((mes, idx) => {
+        const month = idx + 1;
+        return [mes, ...years.map((year) => matrix[year][month] || 0)];
+      })
+    };
+
+    const seriesData = years.map((year) => ({
+      name: year.toString(),
+      data: meses.map((_, idx) => matrix[year][idx + 1] || 0),
+    }));
+
     buildClientHistoryChart(meses, seriesData, `Historial de Facturación - ${client.customer_name}`);
-
-    // Mostrar tabla
     buildClientHistoryTable(tableData, client.customer_name);
   }
 
@@ -1812,7 +1975,7 @@ $cssVars = core_brand_css_vars();
           }
         }
       },
-      colors: ['#0171e2', '#004fa8', '#65625f'],
+      colors: ['#eab308', '#ef4444', '#22c55e'],
       stroke: {
         curve: 'smooth',
         width: 2

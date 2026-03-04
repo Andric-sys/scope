@@ -170,7 +170,9 @@ try {
     SELECT
       COALESCE(o.conveyance_type,'unknown') AS traffic,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
+        THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
@@ -179,7 +181,19 @@ try {
   ";
   $st = $pdo->prepare($sqlTraffic);
   $st->execute($p);
-  $trafficRows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+  $trafficRowsRaw = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+  $trafficRows = array_map(function($r){
+    $s = (float)$r['sales'];
+    $c = (float)$r['costs'];
+    $p = $s - $c;
+    return [
+      'traffic' => (string)$r['traffic'],
+      'sales' => $s,
+      'costs' => $c,
+      'profit' => $p,
+      'margin' => ($s > 0) ? ($p / $s) : 0.0,
+    ];
+  }, $trafficRowsRaw);
 
   // Oficinas (ventas vs utilidad)
   $sqlOffice = "
@@ -238,6 +252,83 @@ try {
     ];
   }, $topRaw);
 
+  // Facturación (alineada a vistas_crudas: income + entry_number válido + total = amount + tax)
+  $sqlInvSummary = "
+    SELECT
+      COUNT(DISTINCT j.entry_number) AS total_facturas,
+      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total_income,
+      COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS total_iva
+    FROM scope_jobcosting_entries j
+    LEFT JOIN scope_orders o ON o.id = j.order_id
+    WHERE $where
+      AND LOWER(COALESCE(j.entry_type,'')) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+  ";
+  $st = $pdo->prepare($sqlInvSummary);
+  $st->execute($p);
+  $invSummary = $st->fetch(PDO::FETCH_ASSOC) ?: ['total_facturas'=>0,'total_income'=>0,'total_iva'=>0];
+
+  $sqlInvMonthly = "
+    SELECT
+      $ymExpr AS ym,
+      COUNT(DISTINCT j.entry_number) AS invoices,
+      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total,
+      COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS iva
+    FROM scope_jobcosting_entries j
+    LEFT JOIN scope_orders o ON o.id = j.order_id
+    WHERE $where
+      AND LOWER(COALESCE(j.entry_type,'')) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+    GROUP BY $ymExpr
+    ORDER BY ym ASC
+  ";
+  $st = $pdo->prepare($sqlInvMonthly);
+  $st->execute($p);
+  $invMonthly = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+  $sqlDocTypes = "
+    SELECT
+      SUBSTRING_INDEX(j.entry_number, '-', 1) AS doc_type,
+      COUNT(DISTINCT j.entry_number) AS invoices,
+      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total
+    FROM scope_jobcosting_entries j
+    LEFT JOIN scope_orders o ON o.id = j.order_id
+    WHERE $where
+      AND LOWER(COALESCE(j.entry_type,'')) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+    GROUP BY SUBSTRING_INDEX(j.entry_number, '-', 1)
+    ORDER BY total DESC
+  ";
+  $st = $pdo->prepare($sqlDocTypes);
+  $st->execute($p);
+  $docTypes = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+  $sqlInvRecent = "
+    SELECT
+      DATE(j.invoice_date) AS fecha,
+      o.order_number AS referencia,
+      o.customer_name AS cliente,
+      j.entry_number AS factura,
+      COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS monto,
+      COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS iva,
+      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total
+    FROM scope_jobcosting_entries j
+    LEFT JOIN scope_orders o ON o.id = j.order_id
+    WHERE $where
+      AND LOWER(COALESCE(j.entry_type,'')) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+    GROUP BY DATE(j.invoice_date), o.order_number, o.customer_name, j.entry_number
+    ORDER BY fecha DESC, factura DESC
+    LIMIT 20
+  ";
+  $st = $pdo->prepare($sqlInvRecent);
+  $st->execute($p);
+  $invRecent = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
   json_out(200, [
     'success' => true,
     'filters' => [
@@ -270,6 +361,38 @@ try {
     'traffic' => $trafficRows,
     'offices' => $officeRows,
     'top_clients' => $topClients,
+    'invoicing' => [
+      'total_facturas' => (int)($invSummary['total_facturas'] ?? 0),
+      'income' => (float)($invSummary['total_income'] ?? 0),
+      'iva' => (float)($invSummary['total_iva'] ?? 0),
+      'days_avg' => null,
+      'monthly' => array_map(function($r){
+        return [
+          'ym' => (string)$r['ym'],
+          'invoices' => (int)$r['invoices'],
+          'total' => (float)$r['total'],
+          'iva' => (float)$r['iva'],
+        ];
+      }, $invMonthly),
+      'doc_types' => array_map(function($r){
+        return [
+          'doc_type' => (string)($r['doc_type'] ?? ''),
+          'invoices' => (int)$r['invoices'],
+          'total' => (float)$r['total'],
+        ];
+      }, $docTypes),
+      'recent' => array_map(function($r){
+        return [
+          'fecha' => (string)$r['fecha'],
+          'referencia' => (string)($r['referencia'] ?? ''),
+          'cliente' => (string)($r['cliente'] ?? ''),
+          'factura' => (string)($r['factura'] ?? ''),
+          'monto' => (float)$r['monto'],
+          'iva' => (float)$r['iva'],
+          'total' => (float)$r['total'],
+        ];
+      }, $invRecent),
+    ],
   ]);
 
 } catch (Throwable $e) {

@@ -33,26 +33,16 @@ try {
   if ($mode === 'economic') $dateField = 'j.economic_date';
   if ($mode === 'manual')   $dateField = ($manualBase === 'economic') ? 'j.economic_date' : 'j.invoice_date';
 
-  // Construcción del WHERE y parámetros
+  // Construcción del WHERE y parámetros (alineado con dashboard principal)
   $wMax = [];
   $pMax = [];
 
-  if ($office !== 'all') {
-    $wMax[] = 'o.office_code = ?';
-    $pMax[] = $office;
-  }
+  $wMax[] = "$dateField IS NOT NULL";
+  if ($office !== 'all') { $wMax[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $pMax[':office'] = $office; }
+  if ($traffic !== 'all') { $wMax[] = "o.conveyance_type = :traffic"; $pMax[':traffic'] = $traffic; }
+  if ($currency !== 'ALL') { $wMax[] = "j.amount_currency = :currency"; $pMax[':currency'] = $currency; }
 
-  if ($traffic !== 'all') {
-    $wMax[] = 'o.traffic_type = ?';
-    $pMax[] = $traffic;
-  }
-
-  if ($currency !== 'ALL') {
-    $wMax[] = 'j.amount_currency = ?';
-    $pMax[] = $currency;
-  }
-
-  $whereB = implode(' AND ', $wMax) ?: '1=1';
+  $whereB = implode(' AND ', $wMax);
 
   if ($mode !== 'manual') {
     $maxDateSql = "SELECT MAX($dateField) as md FROM scope_jobcosting_entries j LEFT JOIN scope_orders o ON o.id = j.order_id WHERE $whereB";
@@ -62,21 +52,26 @@ try {
     $maxDate = $maxRow['md'] ?? null;
 
     if ($maxDate) {
-      $max = new DateTime($maxDate);
-      $from = (clone $max)->modify("-${months} months")->format('Y-m-d');
+      $max = new DateTimeImmutable((string)$maxDate, new DateTimeZone('America/Mexico_City'));
       $to = $max->format('Y-m-d');
+      $from = $max
+        ->modify('first day of this month')
+        ->sub(new DateInterval('P'.($months-1).'M'))
+        ->format('Y-m-d');
     } else {
-      $to = date('Y-m-d');
-      $from = date('Y-m-d', strtotime("-${months} months"));
+      $now = new DateTimeImmutable('now', new DateTimeZone('America/Mexico_City'));
+      $to = $now->format('Y-m-d');
+      $from = $now
+        ->modify('first day of this month')
+        ->sub(new DateInterval('P'.($months-1).'M'))
+        ->format('Y-m-d');
     }
   }
 
   $p = $pMax;
-  $where = $whereB;
-  
-  $where .= " AND $dateField >= ? AND $dateField <= ?";
-  $p[] = $from;
-  $p[] = $to;
+  $where = $whereB . " AND DATE($dateField) BETWEEN :from AND :to";
+  $p[':from'] = $from;
+  $p[':to'] = $to;
 
   // TODOS los clientes (sin LIMIT)
   $sqlAllClients = "
