@@ -34,6 +34,8 @@ try {
 
   $office = (string)($_GET['office'] ?? 'all');
   $traffic = (string)($_GET['traffic'] ?? 'all');
+  $currency = strtoupper(trim((string)($_GET['currency'] ?? 'MXN')));
+  if ($currency === '') $currency = 'MXN';
 
   $w = [];
   $p = [];
@@ -42,6 +44,7 @@ try {
   $w[] = "DATE($field) BETWEEN :from AND :to";
   $p[':from'] = $from;
   $p[':to'] = $to;
+  if ($currency !== 'ALL') { $w[] = "j.amount_currency = :currency"; $p[':currency'] = $currency; }
 
   if ($office !== 'all') { $w[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $p[':office']=$office; }
   if ($traffic !== 'all') { $w[] = "o.conveyance_type = :traffic"; $p[':traffic']=$traffic; }
@@ -58,12 +61,12 @@ try {
     $sql = "
       SELECT
         $ym AS ym,
-        COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-          THEN j.local_amount_value ELSE 0 END),0) AS sales,
-        COALESCE(SUM(CASE WHEN j.entry_type='payable'
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+          THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
           THEN j.local_amount_value ELSE 0 END),0) AS costs
       FROM scope_jobcosting_entries j
-      JOIN scope_orders o ON o.id = j.order_id
+      LEFT JOIN scope_orders o ON o.id = j.order_id
       WHERE $where AND o.customer_code = :cust
       GROUP BY $ym
       ORDER BY ym ASC
@@ -84,12 +87,12 @@ try {
     $sql = "
       SELECT
         COALESCE(j.charge_type_code,'—') AS concept_code,
-        COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-          THEN j.local_amount_value ELSE 0 END),0) AS sales,
-        COALESCE(SUM(CASE WHEN j.entry_type='payable'
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+          THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
           THEN j.local_amount_value ELSE 0 END),0) AS costs
       FROM scope_jobcosting_entries j
-      JOIN scope_orders o ON o.id = j.order_id
+      LEFT JOIN scope_orders o ON o.id = j.order_id
       WHERE $where AND o.conveyance_type = :t
       GROUP BY COALESCE(j.charge_type_code,'—')
       ORDER BY sales DESC
@@ -119,7 +122,7 @@ try {
         j.local_amount_value AS amount_local,
         j.local_tax_value AS tax_local
       FROM scope_jobcosting_entries j
-      JOIN scope_orders o ON o.id = j.order_id
+      LEFT JOIN scope_orders o ON o.id = j.order_id
       WHERE $where AND j.charge_type_code = :c
       ORDER BY DATE($field) DESC
       LIMIT 300

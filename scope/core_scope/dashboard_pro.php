@@ -435,6 +435,7 @@ $cssVars = core_brand_css_vars();
         <option value="invoice">Manual sobre InvoiceDate</option>
         <option value="economic">Manual sobre EconomicDate</option>
       </select>
+      <input id="inManualMonth" type="month" class="input" title="Seleccionar mes">
       <input id="inFrom" type="date" class="input">
       <input id="inTo" type="date" class="input">
     </div>
@@ -452,7 +453,7 @@ $cssVars = core_brand_css_vars();
 
       <div class="grid">
         <div class="card kpi">
-          <div class="label">Ventas (sin PT)</div>
+          <div class="label">Ventas (Total Income)</div>
           <div class="value" id="kSales">$—</div>
           <div class="sub">
             <span class="delta" id="dSales">—</span>
@@ -928,8 +929,26 @@ $cssVars = core_brand_css_vars();
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth()+1).padStart(2,'0');
+  $('inManualMonth').value = `${y}-${m}`;
   $('inFrom').value = `${y}-${m}-01`;
   $('inTo').value = `${y}-${m}-${String(new Date(y, now.getMonth()+1, 0).getDate()).padStart(2,'0')}`;
+
+  function setManualRangeFromMonth(monthValue){
+    if (!/^\d{4}-\d{2}$/.test(String(monthValue || ''))) return;
+    const [yy, mm] = monthValue.split('-').map(Number);
+    const last = new Date(yy, mm, 0).getDate();
+    $('inFrom').value = `${yy}-${String(mm).padStart(2,'0')}-01`;
+    $('inTo').value = `${yy}-${String(mm).padStart(2,'0')}-${String(last).padStart(2,'0')}`;
+  }
+
+  function syncManualMonthFromRange(){
+    const from = String($('inFrom').value || '');
+    const to = String($('inTo').value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return;
+    if (from.slice(0,7) === to.slice(0,7)) {
+      $('inManualMonth').value = from.slice(0,7);
+    }
+  }
 
   let chartMain=null, chartTraffic=null, chartOffice=null, modalChart=null;
 
@@ -967,7 +986,7 @@ $cssVars = core_brand_css_vars();
       xaxis: { categories: labels },
       tooltip: { y: { formatter: (v)=> money(v) } },
       series: [
-        { name:'Ventas (sin PT)', data: sales },
+        { name:'Ventas (Total Income)', data: sales },
         { name:'Costos', data: costs },
         { name:'Utilidad', data: profit }
       ],
@@ -1844,12 +1863,35 @@ $cssVars = core_brand_css_vars();
       b.classList.toggle('active', b.dataset.mode === newMode);
     });
     $('manualBox').style.display = (newMode === 'manual') ? 'flex' : 'none';
+    if (newMode === 'manual') {
+      const selectedMonth = $('inManualMonth').value || `${y}-${m}`;
+      setManualRangeFromMonth(selectedMonth);
+    }
   }
 
   $('segMode').addEventListener('click', (e)=>{
     const b = e.target.closest('button[data-mode]');
     if (!b) return;
     setMode(b.dataset.mode);
+  });
+
+  $('inManualMonth').addEventListener('change', ()=>{
+    setManualRangeFromMonth($('inManualMonth').value);
+    if (state.mode === 'manual') load();
+  });
+
+  $('inFrom').addEventListener('change', ()=>{
+    syncManualMonthFromRange();
+    if (state.mode === 'manual') load();
+  });
+
+  $('inTo').addEventListener('change', ()=>{
+    syncManualMonthFromRange();
+    if (state.mode === 'manual') load();
+  });
+
+  $('selManualBase').addEventListener('change', ()=>{
+    if (state.mode === 'manual') load();
   });
 
   $('btnReload').addEventListener('click', load);

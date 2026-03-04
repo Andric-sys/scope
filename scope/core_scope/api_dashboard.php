@@ -27,6 +27,8 @@ try {
 
   $office = (string)($_GET['office'] ?? 'all'); // all|1000|2000|3000
   $traffic = (string)($_GET['traffic'] ?? 'all'); // all|road|sea|air
+  $currency = strtoupper(trim((string)($_GET['currency'] ?? 'MXN')));
+  if ($currency === '') $currency = 'MXN';
 
   $months = (int)($_GET['months'] ?? 12);
   if ($months < 3) $months = 3;
@@ -51,6 +53,7 @@ try {
     $pMax = [];
 
     $wMax[] = "$dateField IS NOT NULL";
+    if ($currency !== 'ALL') { $wMax[] = "j.amount_currency = :currency"; $pMax[':currency'] = $currency; }
 
     if ($office !== 'all') { $wMax[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $pMax[':office'] = $office; }
     if ($traffic !== 'all') { $wMax[] = "o.conveyance_type = :traffic"; $pMax[':traffic'] = $traffic; }
@@ -58,7 +61,7 @@ try {
     $sqlMax = "
       SELECT DATE(MAX($dateField)) AS d
       FROM scope_jobcosting_entries j
-      JOIN scope_orders o ON o.id = j.order_id
+      LEFT JOIN scope_orders o ON o.id = j.order_id
       WHERE ".implode(' AND ', $wMax)."
     ";
     $st = $pdo->prepare($sqlMax);
@@ -91,25 +94,26 @@ try {
   $w[] = "DATE($dateField) BETWEEN :from AND :to";
   $p[':from'] = $from;
   $p[':to'] = $to;
+  if ($currency !== 'ALL') { $w[] = "j.amount_currency = :currency"; $p[':currency'] = $currency; }
 
   if ($office !== 'all') { $w[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $p[':office'] = $office; }
   if ($traffic !== 'all') { $w[] = "o.conveyance_type = :traffic"; $p[':traffic'] = $traffic; }
 
   $where = implode(' AND ', $w);
 
-  // KPI: ventas (income sin PT), IVA ventas, costos (payable), TER income (PT)
+  // KPI: ventas (income sin PT) basadas en "total" de vistas_crudas: amount_value + tax_value
   $sqlKpis = "
     SELECT
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_tax_value ELSE 0 END),0) AS vat_sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='payable'
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN IFNULL(j.tax_value,0) ELSE 0 END),0) AS vat_sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND j.charge_type_code LIKE 'PT%'
-        THEN j.local_amount_value ELSE 0 END),0) AS ter_income
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND UPPER(COALESCE(j.charge_type_code,'')) LIKE 'PT%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS ter_income
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
   ";
   $st = $pdo->prepare($sqlKpis);
@@ -127,12 +131,12 @@ try {
   $sqlSeries = "
     SELECT
       $ymExpr AS ym,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='payable'
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
     GROUP BY $ymExpr
     ORDER BY ym ASC
@@ -161,14 +165,14 @@ try {
     $marginPts = ($bMargin - $aMargin); // en “puntos” (ej 0.01 = 1pt)
   }
 
-  // Distribución por tráfico (ventas sin PT)
+  // Distribución por tráfico (ventas sin PT con total de vistas_crudas)
   $sqlTraffic = "
     SELECT
       COALESCE(o.conveyance_type,'unknown') AS traffic,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
     GROUP BY o.conveyance_type
     ORDER BY sales DESC
@@ -181,12 +185,12 @@ try {
   $sqlOffice = "
     SELECT
       COALESCE(j.cost_center_code, o.cost_center_code) AS office,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='payable'
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
     GROUP BY COALESCE(j.cost_center_code, o.cost_center_code)
     ORDER BY sales DESC
@@ -206,12 +210,12 @@ try {
     SELECT
       o.customer_code,
       o.customer_name,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='payable'
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
     GROUP BY o.customer_code, o.customer_name
     ORDER BY sales DESC
@@ -240,6 +244,7 @@ try {
       'mode' => $mode,
       'office' => $office,
       'traffic' => $traffic,
+      'currency' => $currency,
       'from' => $from,
       'to' => $to,
       'date_field' => str_replace('j.','',$dateField),

@@ -16,6 +16,8 @@ try {
 
   $office = (string)($_GET['office'] ?? 'all');
   $traffic = (string)($_GET['traffic'] ?? 'all');
+  $currency = strtoupper(trim((string)($_GET['currency'] ?? 'MXN')));
+  if ($currency === '') $currency = 'MXN';
 
   $months = (int)($_GET['months'] ?? 12);
   if ($months < 3) $months = 3;
@@ -45,10 +47,15 @@ try {
     $pMax[] = $traffic;
   }
 
+  if ($currency !== 'ALL') {
+    $wMax[] = 'j.amount_currency = ?';
+    $pMax[] = $currency;
+  }
+
   $whereB = implode(' AND ', $wMax) ?: '1=1';
 
   if ($mode !== 'manual') {
-    $maxDateSql = "SELECT MAX($dateField) as md FROM scope_jobcosting_entries j JOIN scope_orders o ON o.id = j.order_id WHERE $whereB";
+    $maxDateSql = "SELECT MAX($dateField) as md FROM scope_jobcosting_entries j LEFT JOIN scope_orders o ON o.id = j.order_id WHERE $whereB";
     $st = $pdo->prepare($maxDateSql);
     $st->execute($pMax);
     $maxRow = $st->fetch(PDO::FETCH_ASSOC);
@@ -76,12 +83,12 @@ try {
     SELECT
       o.customer_code,
       o.customer_name,
-      COALESCE(SUM(CASE WHEN j.entry_type='income' AND (j.charge_type_code IS NULL OR j.charge_type_code NOT LIKE 'PT%')
-        THEN j.local_amount_value ELSE 0 END),0) AS sales,
-      COALESCE(SUM(CASE WHEN j.entry_type='payable'
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
+        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+      COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
-    JOIN scope_orders o ON o.id = j.order_id
+    LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
     GROUP BY o.customer_code, o.customer_name
     ORDER BY sales DESC
@@ -121,6 +128,7 @@ try {
       'mode' => $mode,
       'office' => $office,
       'traffic' => $traffic,
+      'currency' => $currency,
       'from' => $from,
       'to' => $to,
       'date_field' => str_replace('j.','',$dateField),
