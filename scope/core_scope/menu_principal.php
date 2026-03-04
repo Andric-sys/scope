@@ -297,27 +297,6 @@ $cssVars = core_brand_css_vars();
         <span class="menu-arrow">→</span>
       </a>
       
-      <a href="ordenes_scope.php" class="menu-card">
-        <div class="menu-icon">📦</div>
-        <h3 class="menu-title">Órdenes Scope</h3>
-        <p class="menu-desc">Gestión y seguimiento de órdenes de compra y servicios</p>
-        <span class="menu-arrow">→</span>
-      </a>
-      
-      <a href="transport_orders.php" class="menu-card">
-        <div class="menu-icon">🚚</div>
-        <h3 class="menu-title">Órdenes de Transporte</h3>
-        <p class="menu-desc">Control de órdenes de transporte y logística</p>
-        <span class="menu-arrow">→</span>
-      </a>
-      
-      <a href="jobcosting_totals.php" class="menu-card">
-        <div class="menu-icon">💰</div>
-        <h3 class="menu-title">Job Costing</h3>
-        <p class="menu-desc">Análisis de costos por proyecto y rentabilidad</p>
-        <span class="menu-arrow">→</span>
-      </a>
-      
       <a href="scope_viewer.php" class="menu-card">
         <div class="menu-icon">🔍</div>
         <h3 class="menu-title">Visor Scope</h3>

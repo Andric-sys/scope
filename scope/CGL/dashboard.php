@@ -163,9 +163,7 @@ include __DIR__ . '/partials/header.php';
           <div class="core-scope-logo">
             <div class="core-scope-mark"></div>
           </div>
-          <div class="module-name">CORE SCOPE</div>
-          <div class="module-desc">Sistema de Gestión Empresarial</div>
-          <div class="module-arrow">→</div>
+          <div class="module-name">core scope</div>
         </div>
       </div>
     </div>
@@ -180,7 +178,7 @@ include __DIR__ . '/partials/header.php';
   color: white;
   position: relative;
   overflow: hidden;
-  min-height: 140px;
+  min-height: 120px;
   grid-column: span 2;
   display: flex;
   flex-direction: column;
@@ -225,28 +223,11 @@ include __DIR__ . '/partials/header.php';
 }
 
 .widget-core-scope .module-name {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 1px;
   margin: 0;
-}
-
-.widget-core-scope .module-desc {
-  font-size: 0.9rem;
-  opacity: 0.9;
-  font-weight: 500;
-}
-
-.widget-core-scope .module-arrow {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-top: 8px;
-  opacity: 0.8;
-  transition: transform 0.3s ease;
-}
-
-.widget-core-scope:hover .module-arrow {
-  transform: translateX(4px);
+  text-transform: lowercase;
 }
 
 @media (max-width: 768px) {

@@ -25,6 +25,17 @@ $cssVars = core_brand_css_vars();
     }
     .wrap{ max-width: 1550px; margin:0 auto; padding:18px 14px 26px; }
 
+    .top-logo{
+      display:flex;
+      justify-content:center;
+      margin-bottom: 12px;
+    }
+    .top-logo img{
+      height: 52px;
+      width: auto;
+      object-fit: contain;
+    }
+
     .topbar{
       background: var(--card);
       border: 1px solid var(--border);
@@ -371,6 +382,9 @@ $cssVars = core_brand_css_vars();
 <body>
 
 <div class="wrap">
+  <div class="top-logo">
+    <img src="../CGL/assets/img/Logo.png" alt="Core Scope Logo">
+  </div>
   <div class="topbar">
     <div class="brand">
       <div class="mark"></div>
