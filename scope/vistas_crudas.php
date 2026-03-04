@@ -4,11 +4,12 @@ declare(strict_types=1);
 /**
  * vistas_crudas.php
  * - Funciona para cualquier mes (input type="month")
- * - 2 vistas:
- *    1) RESUMEN: 1 fila por Factura + Cliente + Totales (para comparar con Excel de Scope)
- *    2) DETALLE: líneas (entries) tal como vienen (tu “API completa”)
- * - Botón Detalle por factura (modal) sin perder información
- * - Exportación del MES COMPLETO (no depende de paginación)
+ * - 3 vistas:
+ *    1) resumen: 1 fila por external_number + cliente + totales (general)
+ *    2) detalle: líneas (entries) tal como vienen
+ *    3) excel:   formato tipo “FEB MXN” (FACTURA = entry_number, solo INCOME, moneda filtrable, totales por factura)
+ * - Modal Detalle por factura
+ * - Exportación del MES COMPLETO (servidor, no depende paginación)
  */
 
 require __DIR__ . '/core_scope/conexion.php';
@@ -29,25 +30,46 @@ if (!preg_match('/^\d{4}-\d{2}$/', $mes)) $mes = date('Y-m');
 $inicio = $mes . '-01';
 $fin = date('Y-m-t', strtotime($inicio));
 
-$vista = (string)($_GET['vista'] ?? 'resumen'); // 'resumen' | 'detalle'
-if (!in_array($vista, ['resumen','detalle'], true)) $vista = 'resumen';
+$vista = (string)($_GET['vista'] ?? 'excel'); // default a excel porque es lo que pide el cliente
+if (!in_array($vista, ['resumen','detalle','excel'], true)) $vista = 'excel';
+
+// Moneda para vista excel (por defecto MXN)
+$moneda = trim((string)($_GET['moneda'] ?? 'MXN'));
+$moneda = $moneda !== '' ? strtoupper($moneda) : 'MXN';
 
 /* =========================
-   AJAX: Detalle de una factura (para modal)
-   (factura + fecha + moneda)
+   Helpers
+========================= */
+function is_income(?string $entryType): bool {
+  $s = strtolower(trim((string)$entryType));
+  return $s !== '' && strpos($s, 'income') !== false;
+}
+
+/* =========================
+   AJAX: Detalle (modal)
+   - resumen: key = external_number + fecha + moneda
+   - excel:   key = entry_number  + fecha + moneda
 ========================= */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'detalle') {
   header('Content-Type: application/json; charset=utf-8');
 
+  $keyType = trim((string)($_GET['keyType'] ?? 'external')); // external|entry
+  $keyType = in_array($keyType, ['external','entry'], true) ? $keyType : 'external';
+
   $factura = trim((string)($_GET['factura'] ?? ''));
   $fecha   = trim((string)($_GET['fecha'] ?? ''));   // YYYY-MM-DD
-  $moneda  = trim((string)($_GET['moneda'] ?? ''));
+  $mon     = trim((string)($_GET['moneda'] ?? ''));
 
-  if ($factura === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || $moneda === '') {
+  if ($factura === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || $mon === '') {
     http_response_code(400);
     echo json_encode(['ok'=>false,'message'=>'Parámetros inválidos.'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+
+  // arma WHERE por tipo de llave
+  $whereKey = $keyType === 'entry'
+    ? "j.entry_number = :factura"
+    : "j.external_number = :factura";
 
   $sql = "
     SELECT
@@ -74,30 +96,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'detalle') {
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE j.invoice_date IS NOT NULL
-      AND j.external_number = :factura
+      AND {$whereKey}
       AND DATE(j.invoice_date) = :fecha
       AND j.amount_currency = :moneda
     ORDER BY j.id ASC
   ";
+
   $st = $pdo->prepare($sql);
   $st->execute([
     ':factura' => $factura,
     ':fecha'   => $fecha,
-    ':moneda'  => $moneda,
+    ':moneda'  => $mon,
   ]);
-  $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+  $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
   echo json_encode(['ok'=>true,'rows'=>$rows], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
 /* =========================
-   Export del MES COMPLETO (servidor)
+   EXPORT (MES COMPLETO) - servidor
 ========================= */
 if (isset($_GET['download']) && $_GET['download'] === '1') {
   $downloadVista = $vista;
 
-  // Query según vista
+  // --------------------
+  // 1) RESUMEN (external_number)
+  // --------------------
   if ($downloadVista === 'resumen') {
     $sql = "
       SELECT
@@ -127,21 +152,14 @@ if (isset($_GET['download']) && $_GET['download'] === '1') {
     $filename = "vistas_crudas_resumen_{$mes}.xls";
     header('Content-Type: application/vnd.ms-excel; charset=utf-8');
     header("Content-Disposition: attachment; filename=\"{$filename}\"");
-    echo "\xEF\xBB\xBF"; // BOM
+    echo "\xEF\xBB\xBF";
 
     echo "<html><head><meta charset='UTF-8'></head><body>";
     echo "<table border='1'>";
     echo "<thead><tr>
-      <th>Factura</th>
-      <th>Fecha factura</th>
-      <th>Moneda</th>
-      <th>Cliente código</th>
-      <th>Cliente</th>
-      <th>Líneas</th>
-      <th>Total neto</th>
-      <th>Total IVA</th>
-      <th>Total neto local</th>
-      <th>Total IVA local</th>
+      <th>Factura</th><th>Fecha factura</th><th>Moneda</th>
+      <th>Cliente código</th><th>Cliente</th><th>Líneas</th>
+      <th>Total neto</th><th>Total IVA</th><th>Total neto local</th><th>Total IVA local</th>
     </tr></thead><tbody>";
 
     foreach ($data as $r) {
@@ -158,45 +176,130 @@ if (isset($_GET['download']) && $_GET['download'] === '1') {
       echo "<td>".h(number_format((float)$r['total_iva_local'],2,'.',''))."</td>";
       echo "</tr>";
     }
-
     echo "</tbody></table></body></html>";
     exit;
   }
 
-  // detalle
+  // --------------------
+  // 2) DETALLE (líneas)
+  // --------------------
+  if ($downloadVista === 'detalle') {
+    $sql = "
+      SELECT
+        j.id,
+        o.order_number,
+        o.customer_name,
+        j.entry_type,
+        j.charge_type_code,
+        COALESCE(j.cost_center_code, o.cost_center_code, '') AS office,
+        o.conveyance_type,
+        j.partner_code,
+        j.partner_name,
+        j.invoice_date,
+        j.economic_date,
+        j.booking_date,
+        j.entry_number,
+        j.external_number,
+        j.amount_currency,
+        j.amount_value,
+        j.tax_value,
+        j.local_amount_value,
+        j.local_tax_value,
+        j.updated_at
+      FROM scope_jobcosting_entries j
+      LEFT JOIN scope_orders o ON o.id = j.order_id
+      WHERE j.invoice_date IS NOT NULL
+        AND DATE(j.invoice_date) BETWEEN :inicio AND :fin
+      ORDER BY j.invoice_date DESC, j.id DESC
+    ";
+    $st = $pdo->prepare($sql);
+    $st->execute([':inicio'=>$inicio, ':fin'=>$fin]);
+    $data = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $filename = "vistas_crudas_detalle_{$mes}.xls";
+    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+    header("Content-Disposition: attachment; filename=\"{$filename}\"");
+    echo "\xEF\xBB\xBF";
+
+    echo "<html><head><meta charset='UTF-8'></head><body>";
+    echo "<table border='1'>";
+    echo "<thead><tr>
+      <th>ID</th><th>Orden</th><th>Cliente</th><th>Tipo</th><th>Concepto</th><th>Oficina</th>
+      <th>Tráfico</th><th>Partner</th><th>Factura (external)</th><th>Fecha factura</th><th>Moneda</th>
+      <th>Neto</th><th>IVA</th><th>Neto (local)</th><th>IVA (local)</th>
+      <th>Fecha económica</th><th>Fecha booking</th><th>No. asiento</th><th>Actualizado</th>
+    </tr></thead><tbody>";
+
+    foreach ($data as $r) {
+      $partner = trim(((string)($r['partner_code'] ?? '')).' '.((string)($r['partner_name'] ?? '')));
+      echo "<tr>";
+      echo "<td>".h($r['id'])."</td>";
+      echo "<td>".h($r['order_number'])."</td>";
+      echo "<td>".h($r['customer_name'])."</td>";
+      echo "<td>".h($r['entry_type'])."</td>";
+      echo "<td>".h($r['charge_type_code'])."</td>";
+      echo "<td>".h($r['office'])."</td>";
+      echo "<td>".h($r['conveyance_type'])."</td>";
+      echo "<td>".h($partner)."</td>";
+      echo "<td>".h($r['external_number'])."</td>";
+      echo "<td>".h((string)$r['invoice_date'])."</td>";
+      echo "<td>".h($r['amount_currency'])."</td>";
+      echo "<td>".h(number_format((float)$r['amount_value'],2,'.',''))."</td>";
+      echo "<td>".h(number_format((float)$r['tax_value'],2,'.',''))."</td>";
+      echo "<td>".h(number_format((float)$r['local_amount_value'],2,'.',''))."</td>";
+      echo "<td>".h(number_format((float)$r['local_tax_value'],2,'.',''))."</td>";
+      echo "<td>".h((string)$r['economic_date'])."</td>";
+      echo "<td>".h((string)$r['booking_date'])."</td>";
+      echo "<td>".h($r['entry_number'])."</td>";
+      echo "<td>".h((string)$r['updated_at'])."</td>";
+      echo "</tr>";
+    }
+    echo "</tbody></table></body></html>";
+    exit;
+  }
+
+  // --------------------
+  // 3) EXCEL (tipo FEB MXN)
+  //   FACTURA = entry_number
+  //   solo income
+  //   moneda = $moneda
+  //   agrupado por entry_number + fecha + moneda + cliente
+  // --------------------
   $sql = "
     SELECT
-      j.id,
-      o.order_number,
-      o.customer_name,
-      j.entry_type,
-      j.charge_type_code,
-      COALESCE(j.cost_center_code, o.cost_center_code, '') AS office,
-      o.conveyance_type,
-      j.partner_code,
-      j.partner_name,
-      j.invoice_date,
-      j.economic_date,
-      j.booking_date,
-      j.entry_number,
-      j.external_number,
-      j.amount_currency,
-      j.amount_value,
-      j.tax_value,
-      j.local_amount_value,
-      j.local_tax_value,
-      j.updated_at
+      SUBSTRING_INDEX(j.entry_number, '-', 1)                      AS serie,
+      j.entry_number                                               AS factura,
+      o.order_number                                               AS referencia,
+      DATE(j.invoice_date)                                         AS fecha,
+      o.customer_code                                              AS cliente_codigo,
+      o.customer_name                                              AS cliente_nombre,
+
+      SUM(IFNULL(j.amount_value,0))                                AS complementarios,
+      SUM(IFNULL(j.tax_value,0))                                   AS iva,
+      SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0))        AS subtotal,
+      0                                                            AS anticipo,
+      SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0))        AS total,
+
+      j.amount_currency                                            AS moneda,
+      COUNT(*)                                                     AS lineas
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE j.invoice_date IS NOT NULL
       AND DATE(j.invoice_date) BETWEEN :inicio AND :fin
-    ORDER BY j.invoice_date DESC, j.id DESC
+      AND j.amount_currency = :moneda
+      AND LOWER(j.entry_type) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+    GROUP BY
+      j.entry_number, o.order_number, DATE(j.invoice_date),
+      o.customer_code, o.customer_name, j.amount_currency
+    ORDER BY fecha DESC, factura DESC
   ";
   $st = $pdo->prepare($sql);
-  $st->execute([':inicio'=>$inicio, ':fin'=>$fin]);
+  $st->execute([':inicio'=>$inicio, ':fin'=>$fin, ':moneda'=>$moneda]);
   $data = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-  $filename = "vistas_crudas_detalle_{$mes}.xls";
+  $filename = "vistas_crudas_excel_{$mes}_{$moneda}.xls";
   header('Content-Type: application/vnd.ms-excel; charset=utf-8');
   header("Content-Disposition: attachment; filename=\"{$filename}\"");
   echo "\xEF\xBB\xBF";
@@ -204,37 +307,29 @@ if (isset($_GET['download']) && $_GET['download'] === '1') {
   echo "<html><head><meta charset='UTF-8'></head><body>";
   echo "<table border='1'>";
   echo "<thead><tr>
-    <th>ID</th><th>Orden</th><th>Cliente</th><th>Tipo</th><th>Concepto</th><th>Oficina</th>
-    <th>Tráfico</th><th>Partner</th><th>Factura</th><th>Fecha factura</th><th>Moneda</th>
-    <th>Neto</th><th>IVA</th><th>Neto (local)</th><th>IVA (local)</th>
-    <th>Fecha económica</th><th>Fecha booking</th><th>No. asiento</th><th>Actualizado</th>
+    <th>SERIE</th><th>FACTURA</th><th>REFERENCIA</th><th>FECHA</th>
+    <th>CLIENTE</th><th>NOMBRE</th>
+    <th>COMPLEMENTARIOS</th><th>IVA</th><th>SUBTOTAL</th><th>ANTICIPO</th><th>TOTAL</th>
+    <th>MONEDA</th><th>LÍNEAS</th>
   </tr></thead><tbody>";
 
   foreach ($data as $r) {
-    $partner = trim(((string)($r['partner_code'] ?? '')).' '.((string)($r['partner_name'] ?? '')));
     echo "<tr>";
-    echo "<td>".h($r['id'])."</td>";
-    echo "<td>".h($r['order_number'])."</td>";
-    echo "<td>".h($r['customer_name'])."</td>";
-    echo "<td>".h($r['entry_type'])."</td>";
-    echo "<td>".h($r['charge_type_code'])."</td>";
-    echo "<td>".h($r['office'])."</td>";
-    echo "<td>".h($r['conveyance_type'])."</td>";
-    echo "<td>".h($partner)."</td>";
-    echo "<td>".h($r['external_number'])."</td>";
-    echo "<td>".h((string)$r['invoice_date'])."</td>";
-    echo "<td>".h($r['amount_currency'])."</td>";
-    echo "<td>".h(number_format((float)$r['amount_value'],2,'.',''))."</td>";
-    echo "<td>".h(number_format((float)$r['tax_value'],2,'.',''))."</td>";
-    echo "<td>".h(number_format((float)$r['local_amount_value'],2,'.',''))."</td>";
-    echo "<td>".h(number_format((float)$r['local_tax_value'],2,'.',''))."</td>";
-    echo "<td>".h((string)$r['economic_date'])."</td>";
-    echo "<td>".h((string)$r['booking_date'])."</td>";
-    echo "<td>".h($r['entry_number'])."</td>";
-    echo "<td>".h((string)$r['updated_at'])."</td>";
+    echo "<td>".h($r['serie'])."</td>";
+    echo "<td>".h($r['factura'])."</td>";
+    echo "<td>".h($r['referencia'])."</td>";
+    echo "<td>".h($r['fecha'])."</td>";
+    echo "<td>".h($r['cliente_codigo'])."</td>";
+    echo "<td>".h($r['cliente_nombre'])."</td>";
+    echo "<td>".h(number_format((float)$r['complementarios'],2,'.',''))."</td>";
+    echo "<td>".h(number_format((float)$r['iva'],2,'.',''))."</td>";
+    echo "<td>".h(number_format((float)$r['subtotal'],2,'.',''))."</td>";
+    echo "<td>0.00</td>";
+    echo "<td>".h(number_format((float)$r['total'],2,'.',''))."</td>";
+    echo "<td>".h($r['moneda'])."</td>";
+    echo "<td>".h((string)$r['lineas'])."</td>";
     echo "</tr>";
   }
-
   echo "</tbody></table></body></html>";
   exit;
 }
@@ -267,7 +362,43 @@ if ($vista === 'resumen') {
   $st = $pdo->prepare($sql);
   $st->execute([':inicio'=>$inicio, ':fin'=>$fin]);
   $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
-} else {
+
+} elseif ($vista === 'excel') {
+  $sql = "
+    SELECT
+      SUBSTRING_INDEX(j.entry_number, '-', 1)                      AS serie,
+      j.entry_number                                               AS factura,
+      o.order_number                                               AS referencia,
+      DATE(j.invoice_date)                                         AS fecha,
+      o.customer_code                                              AS cliente_codigo,
+      o.customer_name                                              AS cliente_nombre,
+
+      SUM(IFNULL(j.amount_value,0))                                AS complementarios,
+      SUM(IFNULL(j.tax_value,0))                                   AS iva,
+      SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0))        AS subtotal,
+      0                                                            AS anticipo,
+      SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0))        AS total,
+
+      j.amount_currency                                            AS moneda,
+      COUNT(*)                                                     AS lineas
+    FROM scope_jobcosting_entries j
+    LEFT JOIN scope_orders o ON o.id = j.order_id
+    WHERE j.invoice_date IS NOT NULL
+      AND DATE(j.invoice_date) BETWEEN :inicio AND :fin
+      AND j.amount_currency = :moneda
+      AND LOWER(j.entry_type) LIKE '%income%'
+      AND j.entry_number IS NOT NULL
+      AND j.entry_number <> ''
+    GROUP BY
+      j.entry_number, o.order_number, DATE(j.invoice_date),
+      o.customer_code, o.customer_name, j.amount_currency
+    ORDER BY fecha DESC, factura DESC
+  ";
+  $st = $pdo->prepare($sql);
+  $st->execute([':inicio'=>$inicio, ':fin'=>$fin, ':moneda'=>$moneda]);
+  $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+} else { // detalle
   $sql = "
     SELECT
       j.id,
@@ -319,7 +450,7 @@ $totalRows = count($rows);
       --btn:#ffd000; --btnText:#111;
       --btn2:#2a2d3f; --btn2Text:#fff;
       --shadow: rgba(0,0,0,.25);
-      --ok:#16a34a; --bad:#ef4444;
+      --bad:#ef4444;
     }
     html[data-theme="light"]{
       --bg:#f6f7fb; --text:#14161f; --muted:#5b6173;
@@ -329,7 +460,7 @@ $totalRows = count($rows);
       --btn:#ffd000; --btnText:#111;
       --btn2:#111827; --btn2Text:#fff;
       --shadow: rgba(17,24,39,.10);
-      --ok:#166534; --bad:#991b1b;
+      --bad:#991b1b;
     }
 
     html, body { height:100%; }
@@ -397,24 +528,14 @@ $totalRows = count($rows);
       overflow:auto;
       border-radius:12px;
       border:1px solid var(--cardBorder);
-      max-height: calc(100vh - 290px);
+      max-height: calc(100vh - 310px);
     }
 
-    table{width:100%; border-collapse:separate; border-spacing:0; min-width:1400px;}
+    table{width:100%; border-collapse:separate; border-spacing:0; min-width:1500px;}
     th, td{padding:9px 8px; border-bottom:1px solid var(--cardBorder); font-size:12px; white-space:nowrap;}
     th{background:var(--th); color:var(--thText); text-align:left; position:sticky; top:0; z-index:2;}
     .num{text-align:right; font-variant-numeric:tabular-nums;}
     .center{text-align:center;}
-
-    .chip{
-      display:inline-flex; align-items:center; gap:6px;
-      border:1px solid var(--cardBorder);
-      background:var(--field);
-      border-radius:999px;
-      padding:4px 10px;
-      font-weight:800;
-      font-size:12px;
-    }
 
     /* Modal */
     .modalBackdrop{
@@ -462,10 +583,13 @@ $totalRows = count($rows);
 
         <div class="topbar">
           <div class="brand">
-            <h1>Vistas crudas · <?= $vista === 'resumen' ? 'Resumen' : 'Detalle' ?></h1>
+            <h1>Vistas crudas · <?= h(strtoupper($vista)) ?></h1>
             <div class="muted">
               Mes: <b><?= h($mes) ?></b> (<?= h($inicio) ?> a <?= h($fin) ?>) ·
               Filas: <b><?= number_format($totalRows) ?></b>
+              <?php if ($vista === 'excel'): ?>
+                · Moneda: <b><?= h($moneda) ?></b> · Solo INCOME
+              <?php endif; ?>
             </div>
           </div>
 
@@ -477,10 +601,11 @@ $totalRows = count($rows);
         <div class="card">
 
           <div class="actions">
+            <a class="btn secondary" href="?mes=<?= h($mes) ?>&vista=excel&moneda=<?= h($moneda) ?>">Excel</a>
             <a class="btn secondary" href="?mes=<?= h($mes) ?>&vista=resumen">Resumen</a>
             <a class="btn secondary" href="?mes=<?= h($mes) ?>&vista=detalle">Detalle</a>
 
-            <a class="btn primary" href="?mes=<?= h($mes) ?>&vista=<?= h($vista) ?>&download=1">Exportar (mes)</a>
+            <a class="btn primary" href="?mes=<?= h($mes) ?>&vista=<?= h($vista) ?><?php if($vista==='excel'): ?>&moneda=<?= h($moneda) ?><?php endif; ?>&download=1">Exportar (mes)</a>
 
             <a class="btn secondary" href="comparar_excel.php?mes=<?= h($mes) ?>">Comparar Excel</a>
             <a class="btn secondary" href="core_scope/scope_menu.php">Volver al menú</a>
@@ -488,10 +613,21 @@ $totalRows = count($rows);
 
           <div class="pager">
             <div class="left">
+
               <form method="get" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0;">
                 <input type="hidden" name="vista" value="<?= h($vista) ?>">
                 <label class="meta">Mes</label>
                 <input type="month" name="mes" value="<?= h($mes) ?>">
+
+                <?php if ($vista === 'excel'): ?>
+                  <label class="meta">Moneda</label>
+                  <select name="moneda">
+                    <?php foreach (['MXN','USD','EUR'] as $m): ?>
+                      <option value="<?= h($m) ?>" <?= $moneda===$m?'selected':'' ?>><?= h($m) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php endif; ?>
+
                 <button class="secondary" type="submit">Aplicar</button>
               </form>
 
@@ -512,18 +648,39 @@ $totalRows = count($rows);
             </div>
 
             <div class="meta">
-              <?= $vista === 'resumen'
-                ? 'Comparación 1 fila por factura (Scope)'
-                : 'Detalle por líneas (entries)'; ?>
+              <?php if ($vista==='excel'): ?>
+                Formato “Excel” (FACTURA = No. asiento) · Solo INCOME
+              <?php elseif ($vista==='resumen'): ?>
+                Resumen general (external_number)
+              <?php else: ?>
+                Detalle por líneas (entries)
+              <?php endif; ?>
             </div>
           </div>
 
           <div class="tableWrap">
             <table id="t">
               <thead>
-              <?php if ($vista === 'resumen'): ?>
+              <?php if ($vista === 'excel'): ?>
                 <tr>
-                  <th>Factura</th>
+                  <th>SERIE</th>
+                  <th>FACTURA</th>
+                  <th>REFERENCIA</th>
+                  <th>FECHA</th>
+                  <th>CLIENTE</th>
+                  <th>NOMBRE</th>
+                  <th class="num">COMPLEMENTARIOS</th>
+                  <th class="num">IVA</th>
+                  <th class="num">SUBTOTAL</th>
+                  <th class="num">ANTICIPO</th>
+                  <th class="num">TOTAL</th>
+                  <th>MONEDA</th>
+                  <th class="num">LÍNEAS</th>
+                  <th class="center">DETALLE</th>
+                </tr>
+              <?php elseif ($vista === 'resumen'): ?>
+                <tr>
+                  <th>Factura (external)</th>
                   <th>Fecha factura</th>
                   <th>Moneda</th>
                   <th>Cliente</th>
@@ -544,7 +701,7 @@ $totalRows = count($rows);
                   <th>Oficina</th>
                   <th>Tráfico</th>
                   <th>Partner</th>
-                  <th>Factura</th>
+                  <th>Factura (external)</th>
                   <th>Fecha factura</th>
                   <th>Moneda</th>
                   <th class="num">Neto</th>
@@ -558,8 +715,39 @@ $totalRows = count($rows);
                 </tr>
               <?php endif; ?>
               </thead>
+
               <tbody>
-              <?php if ($vista === 'resumen'): ?>
+              <?php if ($vista === 'excel'): ?>
+                <?php foreach ($rows as $r): ?>
+                  <tr>
+                    <td><?= h($r['serie']) ?></td>
+                    <td><?= h($r['factura']) ?></td>
+                    <td><?= h($r['referencia']) ?></td>
+                    <td><?= h($r['fecha']) ?></td>
+                    <td><?= h($r['cliente_codigo']) ?></td>
+                    <td><?= h($r['cliente_nombre']) ?></td>
+                    <td class="num"><?= number_format((float)$r['complementarios'], 2) ?></td>
+                    <td class="num"><?= number_format((float)$r['iva'], 2) ?></td>
+                    <td class="num"><?= number_format((float)$r['subtotal'], 2) ?></td>
+                    <td class="num">0.00</td>
+                    <td class="num"><?= number_format((float)$r['total'], 2) ?></td>
+                    <td><?= h($r['moneda']) ?></td>
+                    <td class="num"><?= h((string)$r['lineas']) ?></td>
+                    <td class="center">
+                      <button
+                        class="secondary"
+                        type="button"
+                        data-detalle="1"
+                        data-keytype="entry"
+                        data-factura="<?= h($r['factura']) ?>"
+                        data-fecha="<?= h($r['fecha']) ?>"
+                        data-moneda="<?= h($r['moneda']) ?>"
+                      >Ver</button>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+
+              <?php elseif ($vista === 'resumen'): ?>
                 <?php foreach ($rows as $r): ?>
                   <tr>
                     <td><?= h($r['factura']) ?></td>
@@ -576,6 +764,7 @@ $totalRows = count($rows);
                         class="secondary"
                         type="button"
                         data-detalle="1"
+                        data-keytype="external"
                         data-factura="<?= h($r['factura']) ?>"
                         data-fecha="<?= h($r['fecha_factura']) ?>"
                         data-moneda="<?= h($r['moneda']) ?>"
@@ -583,6 +772,7 @@ $totalRows = count($rows);
                     </td>
                   </tr>
                 <?php endforeach; ?>
+
               <?php else: ?>
                 <?php foreach ($rows as $r):
                   $partner = trim(((string)($r['partner_code'] ?? '')).' '.((string)($r['partner_name'] ?? '')));
@@ -612,11 +802,6 @@ $totalRows = count($rows);
               <?php endif; ?>
               </tbody>
             </table>
-          </div>
-
-          <div class="muted" style="margin-top:10px;">
-            <span class="chip">Resumen = 1 fila por Factura</span>
-            <span class="chip">Detalle = líneas (entries)</span>
           </div>
 
         </div>
@@ -685,7 +870,7 @@ $totalRows = count($rows);
   nextBtn.addEventListener('click', () => { page++; render(); });
   pageSizeEl.addEventListener('change', () => { page = 1; render(); });
 
-  // Modal detalle (solo en vista resumen)
+  // Modal
   const backdrop = document.getElementById('modalBackdrop');
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
@@ -697,12 +882,8 @@ $totalRows = count($rows);
     backdrop.setAttribute('aria-hidden', 'true');
   }
   modalClose.addEventListener('click', closeModal);
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) closeModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-  });
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
   function esc(s){
     return (s ?? '').toString()
@@ -713,8 +894,9 @@ $totalRows = count($rows);
     const factura = btn.dataset.factura || '';
     const fecha   = btn.dataset.fecha || '';
     const moneda  = btn.dataset.moneda || '';
+    const keyType = btn.dataset.keytype || 'external';
 
-    modalTitle.textContent = `Factura ${factura}`;
+    modalTitle.textContent = `Detalle ${factura}`;
     modalSubtitle.textContent = `Fecha: ${fecha} · Moneda: ${moneda}`;
     modalBody.innerHTML = `<div class="loading">Cargando…</div>`;
 
@@ -723,6 +905,7 @@ $totalRows = count($rows);
 
     const url = new URL(window.location.href);
     url.searchParams.set('ajax','detalle');
+    url.searchParams.set('keyType', keyType);
     url.searchParams.set('factura', factura);
     url.searchParams.set('fecha', fecha);
     url.searchParams.set('moneda', moneda);
@@ -744,9 +927,9 @@ $totalRows = count($rows);
             <thead>
               <tr>
                 <th>ID</th><th>Orden</th><th>Cliente</th><th>Tipo</th><th>Concepto</th><th>Oficina</th>
-                <th>Tráfico</th><th>Partner</th><th>Factura</th><th>Fecha factura</th><th>Moneda</th>
+                <th>Tráfico</th><th>Partner</th><th>Factura (external)</th><th>No. asiento</th><th>Fecha factura</th><th>Moneda</th>
                 <th class="num">Neto</th><th class="num">IVA</th><th class="num">Neto (local)</th><th class="num">IVA (local)</th>
-                <th>No. asiento</th><th>Actualizado</th>
+                <th>Actualizado</th>
               </tr>
             </thead>
             <tbody>
@@ -762,13 +945,13 @@ $totalRows = count($rows);
                   <td>${esc(r.conveyance_type)}</td>
                   <td>${esc(partner.trim())}</td>
                   <td>${esc(r.external_number)}</td>
+                  <td>${esc(r.entry_number)}</td>
                   <td>${esc(r.invoice_date)}</td>
                   <td>${esc(r.amount_currency)}</td>
                   <td class="num">${Number(r.amount_value || 0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                   <td class="num">${Number(r.tax_value || 0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                   <td class="num">${Number(r.local_amount_value || 0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                   <td class="num">${Number(r.local_tax_value || 0).toLocaleString('es-MX',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-                  <td>${esc(r.entry_number)}</td>
                   <td>${esc(r.updated_at)}</td>
                 </tr>`;
               }).join('')}
