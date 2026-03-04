@@ -194,6 +194,7 @@ $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 				<div class="card">
 					<div class="actions">
 						<button class="primary" type="button" id="clearFilters">Limpiar filtros</button>
+						<button class="secondary" type="button" id="exportExcel">Exportar a Excel</button>
 						<a class="btn secondary" href="core_scope/scope_menu.php">Volver al menú</a>
 					</div>
 
@@ -471,9 +472,71 @@ $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
 			});
 		}
 
+		function getVisibleRows(){
+			const f = getFilterValues();
+			return tbodyRows.filter(row => rowPasses(row, f));
+		}
+
+		function escapeHtml(value){
+			return (value ?? '').toString()
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;')
+				.replace(/"/g, '&quot;');
+		}
+
+		function exportVisibleToExcel(){
+			const rows = getVisibleRows();
+			const headCells = Array.from(table.querySelectorAll('thead tr:first-child th')).map(th => th.textContent.trim());
+			const bodyHtml = rows.map(row => {
+				const cells = Array.from(row.querySelectorAll('td')).map(td => `<td>${escapeHtml(td.textContent.trim())}</td>`).join('');
+				return `<tr>${cells}</tr>`;
+			}).join('');
+
+			const totalRow = `
+				<tr>
+					<td colspan="14">Totales de filas visibles</td>
+					<td>${escapeHtml(summary.footAmount.textContent)}</td>
+					<td>${escapeHtml(summary.footTax.textContent)}</td>
+					<td>${escapeHtml(summary.footLocalAmount.textContent)}</td>
+					<td>${escapeHtml(summary.footLocalTax.textContent)}</td>
+					<td>${escapeHtml(summary.footRows.textContent)}</td>
+				</tr>
+			`;
+
+			const html = `
+				<html>
+					<head><meta charset="UTF-8"></head>
+					<body>
+						<table border="1">
+							<thead><tr>${headCells.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+							<tbody>${bodyHtml}</tbody>
+							<tfoot>${totalRow}</tfoot>
+						</table>
+					</body>
+				</html>
+			`;
+
+			const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			const stamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+			a.href = url;
+			a.download = `vistas_crudas_${stamp}.xls`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		}
+
+		function initExport(){
+			document.getElementById('exportExcel')?.addEventListener('click', exportVisibleToExcel);
+		}
+
 		fillEntryTypeOptions();
 		initThemeButton();
 		initFilters();
+		initExport();
 		refresh();
 	</script>
 </body>
