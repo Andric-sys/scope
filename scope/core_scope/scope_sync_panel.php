@@ -27,6 +27,12 @@ h1{margin:0 0 10px;color:var(--core-navy)}
 .progress-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:.85rem;color:var(--muted);font-weight:700}
 .progress-track{width:100%;height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
 .progress-bar{height:100%;width:0%;background:var(--core-blue);transition:width .35s ease}
+.live-box{display:none;margin-top:14px;background:#eef5ff;border:1px solid var(--border);border-radius:12px;padding:12px}
+.live-title{font-weight:900;color:var(--core-navy);margin-bottom:8px}
+.live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.live-item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px}
+.live-k{font-size:.75rem;color:var(--muted);font-weight:700}
+.live-v{font-size:1rem;font-weight:900;color:var(--core-navy)}
 .result{margin-top:20px;background:#0b1220;color:#e5e7eb;border-radius:14px;padding:15px;font-size:.85rem;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
@@ -45,6 +51,15 @@ h1{margin:0 0 10px;color:var(--core-navy)}
         <div id="progressBar" class="progress-bar"></div>
       </div>
     </div>
+    <div id="liveBox" class="live-box">
+      <div class="live-title">Carga de datos en tiempo real</div>
+      <div class="live-grid">
+        <div class="live-item"><div class="live-k">Estado</div><div id="liveEstado" class="live-v">—</div></div>
+        <div class="live-item"><div class="live-k">Página</div><div id="livePagina" class="live-v">—</div></div>
+        <div class="live-item"><div class="live-k">Leídos API</div><div id="liveLeidos" class="live-v">0</div></div>
+        <div class="live-item"><div class="live-k">Escritos BD</div><div id="liveEscritos" class="live-v">0</div></div>
+      </div>
+    </div>
     <div id="result" class="result" style="display:none;"></div>
   </div>
 </div>
@@ -55,6 +70,11 @@ const progressWrap = document.getElementById('progressWrap');
 const progressBar = document.getElementById('progressBar');
 const progressPct = document.getElementById('progressPct');
 const progressText = document.getElementById('progressText');
+const liveBox = document.getElementById('liveBox');
+const liveEstado = document.getElementById('liveEstado');
+const livePagina = document.getElementById('livePagina');
+const liveLeidos = document.getElementById('liveLeidos');
+const liveEscritos = document.getElementById('liveEscritos');
 
 let currentProgress = 0;
 let statusPollTimer = null;
@@ -62,6 +82,7 @@ let baselineRunId = 0;
 
 function buildAjaxOptions() {
   return {
+    cache: 'no-store',
     credentials: 'same-origin',
     headers: {
       'Accept': 'application/json',
@@ -70,6 +91,25 @@ function buildAjaxOptions() {
   };
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, options, retries = 2) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await sleep((attempt + 1) * 700);
+        continue;
+      }
+    }
+  }
+  throw lastError || new Error('Error de red al conectar con el servidor.');
+}
 function parsePageFromMessage(msg) {
   if (!msg) return 0;
   const m = String(msg).match(/página\s+(\d+)/i);
@@ -104,6 +144,7 @@ function renderLiveStatus(payload) {
   const stateText = run.is_running
     ? (run.is_waiting ? `En espera (${run.seconds_since_update}s sin cambios)` : 'Procesando')
     : 'Finalizado';
+  const pageHint = parsePageFromMessage(run.message || '');
 
   const msg = run.message || '-';
   const details = [
@@ -124,6 +165,12 @@ function renderLiveStatus(payload) {
 
   result.textContent = details.join('\n');
   setProgress(estimateProgressFromRun(run), run.is_waiting ? 'Esperando respuesta de API/BD...' : msg);
+
+  liveBox.style.display = 'block';
+  liveEstado.textContent = stateText;
+  livePagina.textContent = pageHint > 0 ? String(pageHint) : '—';
+  liveLeidos.textContent = String(readCount);
+  liveEscritos.textContent = String(writeCount);
 }
 
 async function getLatestRunId() {
@@ -168,6 +215,7 @@ async function pollStatus() {
 
 function startStatusPolling() {
   progressWrap.style.display = 'block';
+  liveBox.style.display = 'block';
   setProgress(4, 'Iniciando sincronización...');
   if (statusPollTimer) clearInterval(statusPollTimer);
   statusPollTimer = setInterval(pollStatus, 1500);
@@ -190,14 +238,18 @@ btn.addEventListener('click', async () => {
   btn.textContent = "⟳ Actualizando...";
   result.style.display = "block";
   result.textContent = "Preparando monitoreo en tiempo real...\n";
+  liveEstado.textContent = 'Iniciando';
+  livePagina.textContent = '—';
+  liveLeidos.textContent = '0';
+  liveEscritos.textContent = '0';
 
   baselineRunId = await getLatestRunId();
   startStatusPolling();
   await pollStatus();
 
   try{
-    const url = 'scope_sync.php?mode=incremental&size=100&max_pages=5&days=7&throttle_ms=120&_=' + Date.now();
-    const res = await fetch(url, buildAjaxOptions());
+    const url = 'scope_sync.php?mode=incremental&size=100&max_pages=5&days=7&throttle_ms=120&runtime_sec=900&_=' + Date.now();
+    const res = await fetchWithRetry(url, buildAjaxOptions(), 2);
     const txt = await res.text();
 
     await pollStatus();
@@ -209,7 +261,11 @@ btn.addEventListener('click', async () => {
     result.textContent += `\n\n--- Respuesta final ---\n${rawBlock}`;
     finishProgress(res.ok ? 'Actualización finalizada' : 'Finalizó con errores');
   }catch(e){
-    result.textContent += "\n\nError:\n" + (e?.stack || e);
+    const em = String(e?.message || e || 'Error desconocido');
+    const friendly = em.includes('Failed to fetch')
+      ? 'No se pudo conectar con el servidor (Failed to fetch). Verifica que Apache esté encendido y recarga la página.'
+      : em;
+    result.textContent += "\n\nError:\n" + friendly;
     finishProgress('Error en actualización');
   }
   btn.disabled = false;

@@ -567,7 +567,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
     poll = setInterval(() => pollProgress().catch(()=>{}), 1500);
 
     // ejecutar sync (parámetros sanos)
-    const url = 'scope_sync.php?mode=incremental&size=100&max_pages=5&days=7&throttle_ms=120&_=' + Date.now();
+    const url = 'scope_sync.php?mode=incremental&size=100&max_pages=5&days=7&throttle_ms=120&runtime_sec=900&_=' + Date.now();
     const res = await fetch(url, { credentials:'same-origin' });
     const txt = await res.text();
     let data=null;

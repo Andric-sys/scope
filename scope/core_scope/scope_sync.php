@@ -30,8 +30,13 @@ require __DIR__ . '/scope_upsert.php';
 
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Mexico_City');
-ini_set('max_execution_time', '300');
-set_time_limit(300);
+
+$runtimeSeconds = (int)($_GET['runtime_sec'] ?? 900);
+if ($runtimeSeconds < 120) $runtimeSeconds = 120;
+if ($runtimeSeconds > 3600) $runtimeSeconds = 3600;
+
+ini_set('max_execution_time', (string)$runtimeSeconds);
+set_time_limit($runtimeSeconds);
 
 function json_out(int $code, array $payload): void {
   http_response_code($code);
@@ -172,10 +177,22 @@ try {
   $skippedPages = []; // ✅ páginas saltadas con razón
   $partial = false;
 
+  $startedAtMonotonic = microtime(true);
+  $softStopAtSeconds = max(30, $runtimeSeconds - 20);
+  $shouldStopByTime = false;
+
   $lastMaxUtc=null; $lastMaxRaw=null;
   $page=0;
 
   for ($loop=0; $loop<$maxPages; $loop++) {
+
+    $elapsedSeconds = microtime(true) - $startedAtMonotonic;
+    if ($elapsedSeconds >= $softStopAtSeconds) {
+      $partial = true;
+      $shouldStopByTime = true;
+      $runUpdate('Corte preventivo por tiempo: guardando avance…', $fetched, $upOrders, $upJC);
+      break;
+    }
 
     $runUpdate("Consultando página ".($page+1)."…", $fetched, $upOrders, $upJC);
 
@@ -215,6 +232,14 @@ try {
     if (!$orders) break; // ya no hay más
 
     foreach($orders as $item){
+      $elapsedSeconds = microtime(true) - $startedAtMonotonic;
+      if ($elapsedSeconds >= $softStopAtSeconds) {
+        $partial = true;
+        $shouldStopByTime = true;
+        $runUpdate('Corte preventivo por tiempo: guardando avance…', $fetched, $upOrders, $upJC);
+        break;
+      }
+
       $uuid = (string)($item['identifier'] ?? '');
       if ($uuid==='') continue;
 
@@ -254,6 +279,8 @@ try {
       if ($throttleMs>0) usleep($throttleMs*1000);
     }
 
+    if ($shouldStopByTime) break;
+
     $page++;
   }
 
@@ -280,6 +307,7 @@ try {
   $msg = 'Sin cambios recientes';
   if ($upOrders > 0) $msg = 'Actualización completada';
   if ($partial || count($skippedPages) > 0) $msg = 'Actualización parcial (se guardó información)';
+  if ($shouldStopByTime) $msg = 'Actualización parcial por límite de tiempo (avance guardado)';
 
   $pdo->prepare("
     UPDATE scope_sync_runs
@@ -300,6 +328,7 @@ try {
     'run_uuid'=>$runUuid,
     'page_size'=>$pageSize,
     'max_pages'=>$maxPages,
+    'runtime_sec'=>$runtimeSeconds,
     'page_retries'=>$pageRetries,
     'throttle_ms'=>$throttleMs,
 
