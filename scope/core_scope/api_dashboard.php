@@ -7,6 +7,9 @@ require __DIR__ . '/conexion.php';
 date_default_timezone_set('America/Mexico_City');
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 function json_out(int $code, array $payload): void {
   http_response_code($code);

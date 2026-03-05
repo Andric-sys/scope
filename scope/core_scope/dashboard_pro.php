@@ -4,6 +4,11 @@ declare(strict_types=1);
 // Proteger con autenticación
 require __DIR__ . '/auth_guard.php';
 require __DIR__ . '/conexion.php';
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 $cssVars = core_brand_css_vars();
 ?>
 <!doctype html>
@@ -901,6 +906,24 @@ $cssVars = core_brand_css_vars();
   const pct = (x) => (Number(x||0)*100).toLocaleString('es-MX', { maximumFractionDigits: 2 }) + '%';
   const pts = (x) => (Number(x||0)*100).toLocaleString('es-MX', { maximumFractionDigits: 2 }) + ' pts';
 
+  function noCacheUrl(url){
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_=${Date.now()}`;
+  }
+
+  async function fetchNoCache(url, options = {}) {
+    const merged = {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      ...options,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {})
+      }
+    };
+    return fetch(noCacheUrl(url), merged);
+  }
+
   function deltaPill(el, value, kind='pct'){
     const v = Number(value || 0);
     const up = v >= 0;
@@ -1085,7 +1108,7 @@ $cssVars = core_brand_css_vars();
     if (state.office !== 'all') qs.set('office', state.office);
     if (state.traffic !== 'all') qs.set('traffic', state.traffic);
 
-    const res = await fetch('api_detail.php?' + qs.toString());
+    const res = await fetchNoCache('api_detail.php?' + qs.toString());
     const data = await res.json();
     const rows = Array.isArray(data.rows) ? data.rows : [];
 
@@ -1142,7 +1165,7 @@ $cssVars = core_brand_css_vars();
 
     if (state.office !== 'all') qs.set('office', state.office);
 
-    const res = await fetch('api_detail.php?' + qs.toString());
+    const res = await fetchNoCache('api_detail.php?' + qs.toString());
     const data = await res.json();
     const rows = Array.isArray(data.rows) ? data.rows : [];
 
@@ -1199,7 +1222,7 @@ $cssVars = core_brand_css_vars();
     if (state.office !== 'all') qs.set('office', state.office);
     if (state.traffic !== 'all') qs.set('traffic', state.traffic);
 
-    const res = await fetch('api_detail.php?' + qs.toString());
+    const res = await fetchNoCache('api_detail.php?' + qs.toString());
     const data = await res.json();
     const rows = Array.isArray(data.rows) ? data.rows : [];
 
@@ -1247,7 +1270,7 @@ $cssVars = core_brand_css_vars();
       qs.set('to', $('inTo').value);
     }
 
-    const res = await fetch('api_dashboard.php?' + qs.toString());
+    const res = await fetchNoCache('api_dashboard.php?' + qs.toString());
     const data = await res.json();
     if (!data || data.success !== true) {
       alert('Error cargando dashboard. Revisa consola.');
@@ -1429,7 +1452,7 @@ $cssVars = core_brand_css_vars();
   
   async function loadMetas(anio = 2026) {
     try {
-      const res = await fetch(`api_metas_ventas.php?anio=${anio}`);
+      const res = await fetchNoCache(`api_metas_ventas.php?anio=${anio}`);
       const data = await res.json();
       
       if (!data.success) {
@@ -1625,7 +1648,7 @@ $cssVars = core_brand_css_vars();
     }
     
     try {
-      const res = await fetch('api_metas_ventas.php', {
+      const res = await fetchNoCache('api_metas_ventas.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1677,7 +1700,7 @@ $cssVars = core_brand_css_vars();
       }
 
       // Llamar a nueva API que retorna TODOS los clientes
-      const res = await fetch('api_all_clients.php?' + qs.toString());
+      const res = await fetchNoCache('api_all_clients.php?' + qs.toString());
       const data = await res.json();
       
       if (!data.success) {
@@ -1900,7 +1923,7 @@ $cssVars = core_brand_css_vars();
 
     let rows = [];
     try {
-      const res = await fetch('api_detail.php?' + qs.toString());
+      const res = await fetchNoCache('api_detail.php?' + qs.toString());
       const data = await res.json();
       rows = Array.isArray(data.rows) ? data.rows : [];
     } catch (error) {
