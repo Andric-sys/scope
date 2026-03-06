@@ -435,6 +435,28 @@ $cssVars = core_brand_css_vars();
       <option value="air">Aéreo (air)</option>
     </select>
 
+    <select id="selChargeType" class="select">
+      <option value="all">Todos Conceptos</option>
+      <option value="IAD02">IAD02 - Almacenaje Importación</option>
+      <option value="IAD10">IAD10 - Servicios Varios</option>
+      <option value="PT01">PT01 - Transporte</option>
+      <option value="ITR02">ITR02 - Tránsito</option>
+      <option value="IAT02">IAT02 - Aduanal</option>
+      <option value="IEX01">IEX01 - Exportación</option>
+      <option value="IAD09">IAD09 - Servicios</option>
+      <option value="IEX02">IEX02 - Exportación II</option>
+      <option value="IAD03">IAD03 - Almacenaje Especial</option>
+      <option value="ITR03">ITR03 - Tránsito III</option>
+      <option value="IEX04">IEX04 - Exportación IV</option>
+    </select>
+
+    <select id="selFinancialStatus" class="select">
+      <option value="all">Todos Estatus</option>
+      <option value="billed">Billed</option>
+      <option value="open">Open</option>
+      <option value="closed">Closed</option>
+    </select>
+
     <div id="manualBox" style="display:none; gap:10px; flex-wrap:wrap; align-items:center;">
       <select id="selManualBase" class="select">
         <option value="invoice">Manual sobre InvoiceDate</option>
@@ -458,7 +480,7 @@ $cssVars = core_brand_css_vars();
 
       <div class="grid">
         <div class="card kpi">
-          <div class="label">Ventas (Total Income)</div>
+          <div class="label">Ventas Netas (sin IVA)</div>
           <div class="value" id="kSales">$—</div>
           <div class="sub">
             <span class="delta" id="dSales">—</span>
@@ -613,6 +635,32 @@ $cssVars = core_brand_css_vars();
             </thead>
             <tbody>
               <tr><td colspan="6" class="muted">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card full" style="grid-column: span 12;">
+          <div class="title">
+            <div>
+              <div class="h">Detalle de Facturas</div>
+              <div class="s">Resumen de facturas emitidas. Click en una para ver sus conceptos y montos.</div>
+            </div>
+          </div>
+          <table class="table" id="tblInvoicesDetail">
+            <thead>
+              <tr>
+                <th>Factura</th>
+                <th>Cliente</th>
+                <th>Fecha</th>
+                <th>Conceptos</th>
+                <th>Monto Neto</th>
+                <th>IVA</th>
+                <th>Total</th>
+                <th style="width:100px; text-align:center;">Ver</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="8" class="muted">Cargando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -899,6 +947,19 @@ $cssVars = core_brand_css_vars();
   </div>
 </div>
 
+<!-- Modal para detalle de factura -->
+<div class="modal-backdrop" id="invoiceDetailBackdrop" style="display:none;">
+  <div class="modal" style="width: min(800px, 95vw); max-height: 90vh; overflow-y: auto;">
+    <div class="modal-head">
+      <div class="modal-title" id="invoiceDetailTitle">Detalle de Factura</div>
+      <button class="xbtn" onclick="closeInvoiceDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="invoiceDetailContent" style="font-size: 0.95rem;">
+      <!-- Contenido generado por JavaScript -->
+    </div>
+  </div>
+</div>
+
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -1018,7 +1079,7 @@ $cssVars = core_brand_css_vars();
       xaxis: { categories: labels },
       tooltip: { y: { formatter: (v)=> money(v) } },
       series: [
-        { name:'Ventas (Total Income)', data: sales },
+        { name:'Ventas Netas', data: sales },
         { name:'Costos', data: costs },
         { name:'Utilidad', data: profit }
       ],
@@ -1254,12 +1315,16 @@ $cssVars = core_brand_css_vars();
   async function load(){
     state.office = $('selOffice').value;
     state.traffic = $('selTraffic').value;
+    state.chargeType = $('selChargeType').value;
+    state.financialStatus = $('selFinancialStatus').value;
     state.manualBase = $('selManualBase').value;
 
     const qs = new URLSearchParams({
       mode: state.mode,
       office: state.office,
       traffic: state.traffic,
+      charge_type: state.chargeType,
+      financial_status: state.financialStatus,
       currency: 'MXN',
       months: '12'
     });
@@ -1348,7 +1413,7 @@ $cssVars = core_brand_css_vars();
       dataLabels: { enabled:false },
       xaxis: { categories: invLabels },
       tooltip: { y: { formatter: (v)=> money(v) } },
-      series: [{ name:'Facturación', data: invTotals }],
+      series: [{ name:'Facturación Neta', data: invTotals }],
       colors: ['#eab308'],
       fill: { type:'gradient', gradient: { opacityFrom: 0.22, opacityTo: 0.05 } }
     });
@@ -1378,6 +1443,9 @@ $cssVars = core_brand_css_vars();
           <td>${money(r.total || 0)}</td>
         </tr>`).join('')
       : '<tr><td colspan="6" class="muted">Sin datos</td></tr>';
+
+    // Cargar tabla de detalles de facturas con entries
+    loadInvoicesDetail();
 
     // Tablero 3: Objetivos - cargar metas desde API
     loadMetas();
@@ -1449,6 +1517,181 @@ $cssVars = core_brand_css_vars();
   let clientsData = [];
   let clientsHistoryData = {};
   let metasData = {};
+
+  async function loadInvoicesDetail() {
+    try {
+      // Armar query string con los mismos filtros
+      const qs = new URLSearchParams({
+        mode: state.mode,
+        office: state.office,
+        traffic: state.traffic,
+        charge_type: state.chargeType || 'all',
+        financial_status: state.financialStatus || 'all',
+        currency: 'MXN',
+        months: '12',
+        from: lastFilters.from,
+        to: lastFilters.to,
+        date_base: state.manualBase
+      });
+
+      const res = await fetchNoCache('api_invoices_detail.php?' + qs.toString());
+      
+      if (!res.ok) {
+        console.error('Error loading invoice details:', res.status);
+        $('tblInvoicesDetail').querySelector('tbody').innerHTML = '<tr><td colspan="8" class="muted">Error al cargar datos</td></tr>';
+        return;
+      }
+
+      const data = await res.json();
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+
+      const tbody = $('tblInvoicesDetail').querySelector('tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted">Sin datos disponibles</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `<tr>
+        <td><strong>${r.invoice_number || '—'}</strong></td>
+        <td>${r.client_name || '—'}</td>
+        <td>${r.fecha || '—'}</td>
+        <td><span class="pill" style="background:rgba(0,0,0,.05); color:#333; font-size:.8rem;">${r.entry_count || 0} concepto${r.entry_count !== 1 ? 's' : ''}</span></td>
+        <td>${money(r.monto_neto_total || 0)}</td>
+        <td>${money(r.iva_total || 0)}</td>
+        <td><strong>${money(r.total || 0)}</strong></td>
+        <td style="text-align:center;">
+          <button 
+            class="btn-view" 
+            onclick="viewInvoiceDetail(${r.order_id}, '${(r.invoice_number || '').replace(/'/g, "\\'")}', '${(r.client_name || '').replace(/'/g, "\\'")}')"
+            title="Ver detalle"
+            style="padding:6px 10px; background:#f0f0f0; border:1px solid #ccc; border-radius:6px; cursor:pointer; font-size:.85rem; color:#333;">
+            👁️ Ver
+          </button>
+        </td>
+      </tr>`).join('');
+
+    } catch (err) {
+      console.error('loadInvoicesDetail error:', err);
+      $('tblInvoicesDetail').querySelector('tbody').innerHTML = '<tr><td colspan="8" class="muted">Error al cargar detalles</td></tr>';
+    }
+  }
+
+  async function viewInvoiceDetail(orderId, invoiceNumber, clientName) {
+    try {
+      const res = await fetchNoCache(`api_invoice_detail_modal.php?order_id=${orderId}`);
+      
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        console.error('API Error:', data);
+        alert('Error: ' + (data.error || 'Error desconocido'));
+        return;
+      }
+
+      const order = data.order || {};
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const summary = data.summary || { subtotal: 0, iva: 0, total: 0 };
+
+      // Construir HTML de la factura
+      let contentHtml = `
+        <div style="font-family: Arial, sans-serif; background: white; padding: 30px; max-width: 800px;">
+          
+          <!-- Header de Factura -->
+          <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #333;">FACTURA</h2>
+            <p style="margin: 5px 0; color: #666; font-size: 0.9rem;">Orden: <strong>${order.order_number || '—'}</strong></p>
+          </div>
+
+          <!-- Datos de la Factura -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <p style="margin: 0; font-size: 0.85rem; color: #666;">CLIENTE</p>
+              <p style="margin: 5px 0; font-weight: bold; font-size: 0.95rem;">${order.customer_name || '—'}</p>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 0.85rem; color: #666;">FECHA</p>
+              <p style="margin: 5px 0; font-weight: bold; font-size: 0.95rem;">${order.order_date || '—'}</p>
+            </div>
+          </div>
+
+          <!-- Tabla de Conceptos -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #f5f5f5; border-bottom: 2px solid #333;">
+                <th style="text-align: left; padding: 10px; font-size: 0.85rem; font-weight: bold;">Concepto</th>
+                <th style="text-align: center; padding: 10px; font-size: 0.85rem; font-weight: bold;">Tipo</th>
+                <th style="text-align: right; padding: 10px; font-size: 0.85rem; font-weight: bold;">Monto</th>
+                <th style="text-align: right; padding: 10px; font-size: 0.85rem; font-weight: bold;">IVA</th>
+                <th style="text-align: right; padding: 10px; font-size: 0.85rem; font-weight: bold;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      // Agregar cada concepto (solo positivos)
+      entries.forEach(e => {
+        const monto = Math.abs(Number(e.local_amount_value || 0));
+        const iva = Math.abs(Number(e.local_tax_value || 0));
+        const total = monto + iva;
+        contentHtml += `
+              <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px; font-size: 0.85rem;">${e.charge_type_code || '—'}</td>
+                <td style="text-align: center; padding: 10px; font-size: 0.85rem;"><span style="background: #eee; padding: 2px 6px; border-radius: 3px;">${e.entry_type || '—'}</span></td>
+                <td style="text-align: right; padding: 10px; font-size: 0.85rem;">${money(monto)}</td>
+                <td style="text-align: right; padding: 10px; font-size: 0.85rem;">${money(iva)}</td>
+                <td style="text-align: right; padding: 10px; font-size: 0.85rem;"><strong>${money(total)}</strong></td>
+              </tr>
+        `;
+      });
+
+      contentHtml += `
+            </tbody>
+          </table>
+
+          <!-- Totales -->
+          <div style="border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 15px 0; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 40px; text-align: right;">
+              <div>
+                <p style="margin: 5px 0; font-size: 0.9rem; color: #666;">Subtotal:</p>
+                <p style="margin: 5px 0; font-size: 0.9rem; color: #666;">IVA 16%:</p>
+                <p style="margin: 10px 0; font-size: 1.2rem; font-weight: bold; color: #333;">TOTAL:</p>
+              </div>
+              <div>
+                <p style="margin: 5px 0; font-size: 0.9rem;">${money(summary.subtotal)}</p>
+                <p style="margin: 5px 0; font-size: 0.9rem;">${money(summary.iva)}</p>
+                <p style="margin: 10px 0; font-size: 1.2rem; font-weight: bold; color: #2563eb;">${money(summary.total)}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pie de Factura -->
+          <div style="text-align: center; color: #666; font-size: 0.85rem;">
+            <p style="margin: 10px 0;">Total de conceptos: <strong>${entries.length}</strong></p>
+          </div>
+
+        </div>
+      `;
+
+      $('invoiceDetailTitle').textContent = `Factura: ${invoiceNumber} - ${clientName}`;
+      $('invoiceDetailContent').innerHTML = contentHtml;
+      $('invoiceDetailBackdrop').style.display = 'flex';
+
+    } catch (err) {
+      console.error('viewInvoiceDetail error:', err);
+      alert('Error al cargar el detalle: ' + (err.message || err));
+    }
+  }
+
+  function closeInvoiceDetailModal() {
+    $('invoiceDetailBackdrop').style.display = 'none';
+  }
+
+  // Cerrar modal al hacer click afuera
+  $('invoiceDetailBackdrop')?.addEventListener('click', (e) => {
+    if (e.target.id === 'invoiceDetailBackdrop') {
+      closeInvoiceDetailModal();
+    }
+  });
   
   async function loadMetas(anio = 2026) {
     try {
@@ -2080,6 +2323,11 @@ $cssVars = core_brand_css_vars();
     if (state.mode === 'manual') load();
   });
 
+  $('selOffice').addEventListener('change', load);
+  $('selTraffic').addEventListener('change', load);
+  $('selChargeType').addEventListener('change', load);
+  $('selFinancialStatus').addEventListener('change', load);
+
   $('btnReload').addEventListener('click', load);
   
   // Agregar event listener para selección de cliente
@@ -2088,6 +2336,10 @@ $cssVars = core_brand_css_vars();
   setMode('invoice');
   setBoard('analytics');
   load();
+
+  // Exponer funciones globalmente para usar en onclick
+  window.viewInvoiceDetail = viewInvoiceDetail;
+  window.closeInvoiceDetailModal = closeInvoiceDetailModal;
 })();
 </script>
 

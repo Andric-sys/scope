@@ -62,7 +62,7 @@ try {
       SELECT
         $ym AS ym,
         COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-          THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+          THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
         COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
           THEN j.local_amount_value ELSE 0 END),0) AS costs
       FROM scope_jobcosting_entries j
@@ -88,7 +88,7 @@ try {
       SELECT
         COALESCE(j.charge_type_code,'—') AS concept_code,
         COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-          THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+          THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
         COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
           THEN j.local_amount_value ELSE 0 END),0) AS costs
       FROM scope_jobcosting_entries j

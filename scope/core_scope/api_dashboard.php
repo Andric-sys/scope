@@ -30,6 +30,8 @@ try {
 
   $office = (string)($_GET['office'] ?? 'all'); // all|1000|2000|3000
   $traffic = (string)($_GET['traffic'] ?? 'all'); // all|road|sea|air
+  $chargeType = (string)($_GET['charge_type'] ?? 'all'); // all o código de tipo de cargo
+  $financialStatus = (string)($_GET['financial_status'] ?? 'all'); // all|billed|open|closed
   $currency = strtoupper(trim((string)($_GET['currency'] ?? 'MXN')));
   if ($currency === '') $currency = 'MXN';
 
@@ -60,6 +62,8 @@ try {
 
     if ($office !== 'all') { $wMax[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $pMax[':office'] = $office; }
     if ($traffic !== 'all') { $wMax[] = "o.conveyance_type = :traffic"; $pMax[':traffic'] = $traffic; }
+    if ($chargeType !== 'all') { $wMax[] = "j.charge_type_code = :chargeType"; $pMax[':chargeType'] = $chargeType; }
+    if ($financialStatus !== 'all') { $wMax[] = "o.financial_status = :financialStatus"; $pMax[':financialStatus'] = $financialStatus; }
 
     $sqlMax = "
       SELECT DATE(MAX($dateField)) AS d
@@ -101,20 +105,23 @@ try {
 
   if ($office !== 'all') { $w[] = "COALESCE(j.cost_center_code, o.cost_center_code) = :office"; $p[':office'] = $office; }
   if ($traffic !== 'all') { $w[] = "o.conveyance_type = :traffic"; $p[':traffic'] = $traffic; }
+  if ($chargeType !== 'all') { $w[] = "j.charge_type_code = :chargeType"; $p[':chargeType'] = $chargeType; }
+  if ($financialStatus !== 'all') { $w[] = "o.financial_status = :financialStatus"; $p[':financialStatus'] = $financialStatus; }
 
   $where = implode(' AND ', $w);
 
-  // KPI: ventas (income sin PT) basadas en "total" de vistas_crudas: amount_value + tax_value
+  // KPI: ventas (income) basadas en monto neto (complementarios): amount_value.
+  // El IVA se reporta por separado en vat_sales.
   $sqlKpis = "
     SELECT
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
         THEN IFNULL(j.tax_value,0) ELSE 0 END),0) AS vat_sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND UPPER(COALESCE(j.charge_type_code,'')) LIKE 'PT%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS ter_income
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS ter_income
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
@@ -135,7 +142,7 @@ try {
     SELECT
       $ymExpr AS ym,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
@@ -168,12 +175,12 @@ try {
     $marginPts = ($bMargin - $aMargin); // en “puntos” (ej 0.01 = 1pt)
   }
 
-  // Distribución por tráfico (ventas sin PT con total de vistas_crudas)
+  // Distribución por tráfico (ventas netas sin IVA)
   $sqlTraffic = "
     SELECT
       COALESCE(o.conveyance_type,'unknown') AS traffic,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
@@ -203,7 +210,7 @@ try {
     SELECT
       COALESCE(j.cost_center_code, o.cost_center_code) AS office,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
@@ -228,7 +235,7 @@ try {
       o.customer_code,
       o.customer_name,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%income%' AND j.entry_number IS NOT NULL AND j.entry_number <> ''
-        THEN (IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)) ELSE 0 END),0) AS sales,
+        THEN IFNULL(j.amount_value,0) ELSE 0 END),0) AS sales,
       COALESCE(SUM(CASE WHEN LOWER(COALESCE(j.entry_type,'')) LIKE '%payable%'
         THEN j.local_amount_value ELSE 0 END),0) AS costs
     FROM scope_jobcosting_entries j
@@ -255,11 +262,11 @@ try {
     ];
   }, $topRaw);
 
-  // Facturación (alineada a vistas_crudas: income + entry_number válido + total = amount + tax)
+  // Facturación (ingreso neto y IVA por separado)
   $sqlInvSummary = "
     SELECT
       COUNT(DISTINCT j.entry_number) AS total_facturas,
-      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total_income,
+      COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS total_income,
       COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS total_iva
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
@@ -276,7 +283,7 @@ try {
     SELECT
       $ymExpr AS ym,
       COUNT(DISTINCT j.entry_number) AS invoices,
-      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total,
+      COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS total,
       COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS iva
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
@@ -295,7 +302,7 @@ try {
     SELECT
       SUBSTRING_INDEX(j.entry_number, '-', 1) AS doc_type,
       COUNT(DISTINCT j.entry_number) AS invoices,
-      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total
+      COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS total
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
@@ -317,7 +324,7 @@ try {
       j.entry_number AS factura,
       COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS monto,
       COALESCE(SUM(IFNULL(j.tax_value,0)),0) AS iva,
-      COALESCE(SUM(IFNULL(j.amount_value,0) + IFNULL(j.tax_value,0)),0) AS total
+      COALESCE(SUM(IFNULL(j.amount_value,0)),0) AS total
     FROM scope_jobcosting_entries j
     LEFT JOIN scope_orders o ON o.id = j.order_id
     WHERE $where
@@ -338,6 +345,8 @@ try {
       'mode' => $mode,
       'office' => $office,
       'traffic' => $traffic,
+      'charge_type' => $chargeType,
+      'financial_status' => $financialStatus,
       'currency' => $currency,
       'from' => $from,
       'to' => $to,
